@@ -7,12 +7,11 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.di.DaggerLambdaComponent;
 import com.officialpapers.api.di.LambdaComponent;
-import com.officialpapers.api.model.ApiError;
-import com.officialpapers.api.model.DocumentInstructionCreateRequest;
-import com.officialpapers.api.model.DocumentInstructionListResponse;
-import com.officialpapers.api.model.DocumentInstructionUpdateRequest;
+import com.officialpapers.api.generated.model.DocumentInstructionCreateRequest;
+import com.officialpapers.api.generated.model.DocumentInstructionUpdateRequest;
 import com.officialpapers.api.service.BadRequestException;
 import com.officialpapers.api.service.DocumentInstructionService;
 import com.officialpapers.api.service.NotFoundException;
@@ -27,6 +26,7 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
     private static final LambdaComponent COMPONENT = DaggerLambdaComponent.create();
 
     private final DocumentInstructionService instructionService;
+    private final DocumentInstructionApiMapper apiMapper;
     private final ObjectMapper objectMapper;
 
     public DocumentInstructionHandler() {
@@ -34,16 +34,21 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
     }
 
     private DocumentInstructionHandler(DocumentInstructionHandler delegate) {
-        this(delegate.instructionService, delegate.objectMapper);
+        this(delegate.instructionService, delegate.apiMapper, delegate.objectMapper);
     }
 
     public DocumentInstructionHandler(DocumentInstructionService instructionService) {
-        this(instructionService, new ObjectMapper());
+        this(instructionService, new DocumentInstructionApiMapper(), defaultObjectMapper());
     }
 
     @Inject
-    public DocumentInstructionHandler(DocumentInstructionService instructionService, ObjectMapper objectMapper) {
+    public DocumentInstructionHandler(
+            DocumentInstructionService instructionService,
+            DocumentInstructionApiMapper apiMapper,
+            ObjectMapper objectMapper
+    ) {
         this.instructionService = instructionService;
+        this.apiMapper = apiMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -55,17 +60,23 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
 
             return switch (method) {
                 case "GET" -> pathParams != null && pathParams.containsKey("instructionId")
-                        ? jsonResponse(200, instructionService.getInstruction(requireInstructionId(pathParams)))
-                        : jsonResponse(200, new DocumentInstructionListResponse(instructionService.listInstructions()));
+                        ? jsonResponse(200, apiMapper.toApi(instructionService.getInstruction(requireInstructionId(pathParams))))
+                        : jsonResponse(200, apiMapper.toApiList(instructionService.listInstructions()));
                 case "POST" -> jsonResponse(
                         201,
-                        instructionService.createInstruction(readBody(event, DocumentInstructionCreateRequest.class))
+                        apiMapper.toApi(
+                                instructionService.createInstruction(
+                                        apiMapper.toDomain(readBody(event, DocumentInstructionCreateRequest.class))
+                                )
+                        )
                 );
                 case "PUT" -> jsonResponse(
                         200,
-                        instructionService.updateInstruction(
-                                requireInstructionId(pathParams),
-                                readUpdateBody(event)
+                        apiMapper.toApi(
+                                instructionService.updateInstruction(
+                                        requireInstructionId(pathParams),
+                                        apiMapper.toDomain(readUpdateBody(event))
+                                )
                         )
                 );
                 case "DELETE" -> deleteInstruction(pathParams);
@@ -103,7 +114,9 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
     }
 
     private <T> T readBody(APIGatewayProxyRequestEvent event, Class<T> bodyType) {
-        return readBody(readJson(event), bodyType);
+        JsonNode body = readJson(event);
+        validateCreateBody(bodyType, body);
+        return readBody(body, bodyType);
     }
 
     private DocumentInstructionUpdateRequest readUpdateBody(APIGatewayProxyRequestEvent event) {
@@ -118,6 +131,9 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
                 throw new BadRequestException("Unknown field: " + fieldName);
             }
         });
+
+        validateStringField(body, "title", false);
+        validateStringField(body, "content", false);
 
         return readBody(body, DocumentInstructionUpdateRequest.class);
     }
@@ -143,6 +159,31 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
         }
     }
 
+    private <T> void validateCreateBody(Class<T> bodyType, JsonNode body) {
+        if (bodyType != DocumentInstructionCreateRequest.class) {
+            return;
+        }
+        if (!body.isObject()) {
+            throw new BadRequestException("Request body must be a JSON object");
+        }
+
+        validateStringField(body, "title", true);
+        validateStringField(body, "content", true);
+    }
+
+    private void validateStringField(JsonNode body, String fieldName, boolean required) {
+        JsonNode field = body.get(fieldName);
+        if (field == null || field.isNull()) {
+            if (required) {
+                throw new BadRequestException(fieldName + " is required");
+            }
+            return;
+        }
+        if (!field.isTextual()) {
+            throw new BadRequestException(fieldName + " must be a string");
+        }
+    }
+
     private APIGatewayProxyResponseEvent jsonResponse(int statusCode, Object body) {
         try {
             return response(statusCode, objectMapper.writeValueAsString(body));
@@ -152,7 +193,7 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
     }
 
     private APIGatewayProxyResponseEvent errorResponse(int statusCode, String code, String message) {
-        return jsonResponse(statusCode, new ApiError(code, message, null));
+        return jsonResponse(statusCode, apiMapper.toApiError(code, message));
     }
 
     private APIGatewayProxyResponseEvent response(int statusCode, String body) {
@@ -161,6 +202,10 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
         resp.setHeaders(Map.of("Content-Type", "application/json"));
         resp.setBody(body);
         return resp;
+    }
+
+    private static ObjectMapper defaultObjectMapper() {
+        return new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
 }

@@ -1,6 +1,6 @@
 package com.officialpapers.api.persistence;
 
-import com.officialpapers.api.model.DocumentInstructionMetadata;
+import com.officialpapers.domain.InstructionMetadata;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,7 +34,7 @@ class DynamoDbInstructionMetadataRepositoryTest {
     void saveWritesInstructionMetadataItem() {
         DynamoDbInstructionMetadataRepository repository =
                 new DynamoDbInstructionMetadataRepository(dynamoDbClient, "instruction-metadata");
-        DocumentInstructionMetadata metadata = new DocumentInstructionMetadata(
+        InstructionMetadata metadata = new InstructionMetadata(
                 "11111111-1111-1111-1111-111111111111",
                 "Scholarship",
                 "instructions/11111111-1111-1111-1111-111111111111.txt",
@@ -66,7 +66,7 @@ class DynamoDbInstructionMetadataRepositoryTest {
         DynamoDbInstructionMetadataRepository repository =
                 new DynamoDbInstructionMetadataRepository(dynamoDbClient, "instruction-metadata");
 
-        Optional<DocumentInstructionMetadata> result =
+        Optional<InstructionMetadata> result =
                 repository.findById("11111111-1111-1111-1111-111111111111");
 
         assertTrue(result.isPresent());
@@ -81,7 +81,7 @@ class DynamoDbInstructionMetadataRepositoryTest {
         DynamoDbInstructionMetadataRepository repository =
                 new DynamoDbInstructionMetadataRepository(dynamoDbClient, "instruction-metadata");
 
-        Optional<DocumentInstructionMetadata> result =
+        Optional<InstructionMetadata> result =
                 repository.findById("11111111-1111-1111-1111-111111111111");
 
         assertEquals(Optional.empty(), result);
@@ -110,11 +110,11 @@ class DynamoDbInstructionMetadataRepositoryTest {
         DynamoDbInstructionMetadataRepository repository =
                 new DynamoDbInstructionMetadataRepository(dynamoDbClient, "instruction-metadata");
 
-        List<DocumentInstructionMetadata> result = repository.findAll();
+        List<InstructionMetadata> result = repository.findAll();
 
         assertEquals(2, result.size());
         assertEquals(List.of("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"),
-                result.stream().map(DocumentInstructionMetadata::id).toList());
+                result.stream().map(InstructionMetadata::id).toList());
     }
 
     @Test

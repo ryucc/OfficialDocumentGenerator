@@ -1,6 +1,7 @@
 package com.officialpapers.api.di;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.persistence.DynamoDbInstructionMetadataRepository;
 import com.officialpapers.api.persistence.S3InstructionContentStore;
 import com.officialpapers.api.service.InstructionContentStore;
@@ -20,7 +21,7 @@ public interface LambdaModule {
     @Provides
     @Singleton
     static ObjectMapper provideObjectMapper() {
-        return new ObjectMapper();
+        return new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     @Provides

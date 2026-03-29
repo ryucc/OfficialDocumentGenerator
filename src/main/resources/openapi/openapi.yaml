@@ -7,9 +7,9 @@ info:
     This API supports managing document-writing instructions through CRUD operations.
 
 servers:
-  - url: https://api.example.com/v1
+  - url: https://api.example.com/api/v1
     description: Production
-  - url: https://staging-api.example.com/v1
+  - url: https://staging-api.example.com/api/v1
     description: Staging
 
 tags:
@@ -27,13 +27,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/DocumentInstruction'
+                $ref: '#/components/schemas/DocumentInstructionListResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
@@ -178,6 +172,16 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    DocumentInstructionListResponse:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentInstruction'
 
     DocumentInstructionCreateRequest:
       type: object

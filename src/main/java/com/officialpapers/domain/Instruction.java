@@ -1,6 +1,6 @@
-package com.officialpapers.api.model;
+package com.officialpapers.domain;
 
-public record DocumentInstruction(
+public record Instruction(
         String id,
         String title,
         String content,

@@ -1,17 +1,17 @@
 package com.officialpapers.api.service;
 
-import com.officialpapers.api.model.DocumentInstructionMetadata;
+import com.officialpapers.domain.InstructionMetadata;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface InstructionMetadataRepository {
 
-    void save(DocumentInstructionMetadata metadata);
+    void save(InstructionMetadata metadata);
 
-    Optional<DocumentInstructionMetadata> findById(String instructionId);
+    Optional<InstructionMetadata> findById(String instructionId);
 
-    List<DocumentInstructionMetadata> findAll();
+    List<InstructionMetadata> findAll();
 
     void deleteById(String instructionId);
 }

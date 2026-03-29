@@ -1,9 +1,9 @@
 package com.officialpapers.api.service;
 
-import com.officialpapers.api.model.DocumentInstruction;
-import com.officialpapers.api.model.DocumentInstructionCreateRequest;
-import com.officialpapers.api.model.DocumentInstructionMetadata;
-import com.officialpapers.api.model.DocumentInstructionUpdateRequest;
+import com.officialpapers.domain.CreateInstructionCommand;
+import com.officialpapers.domain.Instruction;
+import com.officialpapers.domain.InstructionMetadata;
+import com.officialpapers.domain.UpdateInstructionCommand;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -17,8 +17,8 @@ import javax.inject.Singleton;
 @Singleton
 public class DocumentInstructionService {
 
-    private static final Comparator<DocumentInstructionMetadata> UPDATED_AT_DESC =
-            Comparator.comparing(DocumentInstructionMetadata::updatedAt).reversed();
+    private static final Comparator<InstructionMetadata> UPDATED_AT_DESC =
+            Comparator.comparing(InstructionMetadata::updatedAt).reversed();
 
     private final InstructionMetadataRepository metadataRepository;
     private final InstructionContentStore contentStore;
@@ -46,24 +46,24 @@ public class DocumentInstructionService {
         this(metadataRepository, contentStore, clock, () -> UUID.randomUUID().toString());
     }
 
-    public List<DocumentInstruction> listInstructions() {
+    public List<Instruction> listInstructions() {
         return metadataRepository.findAll().stream()
                 .sorted(UPDATED_AT_DESC)
                 .map(this::toInstruction)
                 .toList();
     }
 
-    public DocumentInstruction getInstruction(String instructionId) {
+    public Instruction getInstruction(String instructionId) {
         return toInstruction(findMetadata(instructionId));
     }
 
-    public DocumentInstruction createInstruction(DocumentInstructionCreateRequest request) {
+    public Instruction createInstruction(CreateInstructionCommand request) {
         validateCreateRequest(request);
 
         String instructionId = idSupplier.get();
         String timestamp = Instant.now(clock).toString();
         String s3Key = buildS3Key(instructionId);
-        DocumentInstructionMetadata metadata = new DocumentInstructionMetadata(
+        InstructionMetadata metadata = new InstructionMetadata(
                 instructionId,
                 request.title(),
                 s3Key,
@@ -79,7 +79,7 @@ public class DocumentInstructionService {
             throw exception;
         }
 
-        return new DocumentInstruction(
+        return new Instruction(
                 metadata.id(),
                 metadata.title(),
                 request.content(),
@@ -88,12 +88,12 @@ public class DocumentInstructionService {
         );
     }
 
-    public DocumentInstruction updateInstruction(String instructionId, DocumentInstructionUpdateRequest request) {
+    public Instruction updateInstruction(String instructionId, UpdateInstructionCommand request) {
         if (request == null) {
             throw new BadRequestException("Request body is required");
         }
 
-        DocumentInstructionMetadata existing = findMetadata(instructionId);
+        InstructionMetadata existing = findMetadata(instructionId);
         boolean titleProvided = request.title() != null;
         boolean contentProvided = request.content() != null;
 
@@ -103,7 +103,7 @@ public class DocumentInstructionService {
 
         String newTitle = titleProvided ? request.title() : existing.title();
         String timestamp = Instant.now(clock).toString();
-        DocumentInstructionMetadata updated = new DocumentInstructionMetadata(
+        InstructionMetadata updated = new InstructionMetadata(
                 existing.id(),
                 newTitle,
                 existing.s3Key(),
@@ -127,7 +127,7 @@ public class DocumentInstructionService {
         }
 
         String responseContent = contentProvided ? request.content() : contentStore.get(existing.s3Key());
-        return new DocumentInstruction(
+        return new Instruction(
                 updated.id(),
                 updated.title(),
                 responseContent,
@@ -137,18 +137,18 @@ public class DocumentInstructionService {
     }
 
     public void deleteInstruction(String instructionId) {
-        DocumentInstructionMetadata existing = findMetadata(instructionId);
+        InstructionMetadata existing = findMetadata(instructionId);
         metadataRepository.deleteById(instructionId);
         deleteContentQuietly(existing.s3Key());
     }
 
-    private DocumentInstructionMetadata findMetadata(String instructionId) {
+    private InstructionMetadata findMetadata(String instructionId) {
         return metadataRepository.findById(instructionId)
                 .orElseThrow(() -> new NotFoundException("Instruction not found"));
     }
 
-    private DocumentInstruction toInstruction(DocumentInstructionMetadata metadata) {
-        return new DocumentInstruction(
+    private Instruction toInstruction(InstructionMetadata metadata) {
+        return new Instruction(
                 metadata.id(),
                 metadata.title(),
                 contentStore.get(metadata.s3Key()),
@@ -157,7 +157,7 @@ public class DocumentInstructionService {
         );
     }
 
-    private void validateCreateRequest(DocumentInstructionCreateRequest request) {
+    private void validateCreateRequest(CreateInstructionCommand request) {
         if (request == null) {
             throw new BadRequestException("Request body is required");
         }

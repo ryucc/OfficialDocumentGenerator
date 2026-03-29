@@ -1,9 +1,9 @@
 package com.officialpapers.api.service;
 
-import com.officialpapers.api.model.DocumentInstruction;
-import com.officialpapers.api.model.DocumentInstructionCreateRequest;
-import com.officialpapers.api.model.DocumentInstructionMetadata;
-import com.officialpapers.api.model.DocumentInstructionUpdateRequest;
+import com.officialpapers.domain.CreateInstructionCommand;
+import com.officialpapers.domain.Instruction;
+import com.officialpapers.domain.InstructionMetadata;
+import com.officialpapers.domain.UpdateInstructionCommand;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -33,8 +33,8 @@ class DocumentInstructionServiceTest {
                 () -> "11111111-1111-1111-1111-111111111111"
         );
 
-        DocumentInstruction instruction = service.createInstruction(
-                new DocumentInstructionCreateRequest("Scholarship", "Use formal tone")
+        Instruction instruction = service.createInstruction(
+                new CreateInstructionCommand("Scholarship", "Use formal tone")
         );
 
         assertEquals("11111111-1111-1111-1111-111111111111", instruction.id());
@@ -46,14 +46,14 @@ class DocumentInstructionServiceTest {
     void listInstructionsReturnsMostRecentlyUpdatedFirst() {
         InMemoryMetadataRepository metadataRepository = new InMemoryMetadataRepository();
         InMemoryContentStore contentStore = new InMemoryContentStore();
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "11111111-1111-1111-1111-111111111111",
                 "Older",
                 "instructions/11111111-1111-1111-1111-111111111111.txt",
                 "2026-03-29T10:15:30Z",
                 "2026-03-29T10:15:30Z"
         ));
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "22222222-2222-2222-2222-222222222222",
                 "Newer",
                 "instructions/22222222-2222-2222-2222-222222222222.txt",
@@ -69,17 +69,17 @@ class DocumentInstructionServiceTest {
                 INITIAL_CLOCK
         );
 
-        List<DocumentInstruction> items = service.listInstructions();
+        List<Instruction> items = service.listInstructions();
 
         assertEquals(List.of("22222222-2222-2222-2222-222222222222", "11111111-1111-1111-1111-111111111111"),
-                items.stream().map(DocumentInstruction::id).toList());
+                items.stream().map(Instruction::id).toList());
     }
 
     @Test
     void updateInstructionSupportsPartialUpdates() {
         InMemoryMetadataRepository metadataRepository = new InMemoryMetadataRepository();
         InMemoryContentStore contentStore = new InMemoryContentStore();
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "11111111-1111-1111-1111-111111111111",
                 "Original",
                 "instructions/11111111-1111-1111-1111-111111111111.txt",
@@ -94,9 +94,9 @@ class DocumentInstructionServiceTest {
                 UPDATED_CLOCK
         );
 
-        DocumentInstruction instruction = service.updateInstruction(
+        Instruction instruction = service.updateInstruction(
                 "11111111-1111-1111-1111-111111111111",
-                new DocumentInstructionUpdateRequest("Updated", null)
+                new UpdateInstructionCommand("Updated", null)
         );
 
         assertEquals("Updated", instruction.title());
@@ -108,7 +108,7 @@ class DocumentInstructionServiceTest {
     void updateInstructionReturnsCurrentResourceForNoopRequest() {
         InMemoryMetadataRepository metadataRepository = new InMemoryMetadataRepository();
         InMemoryContentStore contentStore = new InMemoryContentStore();
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "11111111-1111-1111-1111-111111111111",
                 "Original",
                 "instructions/11111111-1111-1111-1111-111111111111.txt",
@@ -123,9 +123,9 @@ class DocumentInstructionServiceTest {
                 UPDATED_CLOCK
         );
 
-        DocumentInstruction instruction = service.updateInstruction(
+        Instruction instruction = service.updateInstruction(
                 "11111111-1111-1111-1111-111111111111",
-                new DocumentInstructionUpdateRequest(null, null)
+                new UpdateInstructionCommand(null, null)
         );
 
         assertEquals("Original", instruction.title());
@@ -136,7 +136,7 @@ class DocumentInstructionServiceTest {
     void deleteInstructionRemovesMetadataAndContent() {
         InMemoryMetadataRepository metadataRepository = new InMemoryMetadataRepository();
         InMemoryContentStore contentStore = new InMemoryContentStore();
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "11111111-1111-1111-1111-111111111111",
                 "Original",
                 "instructions/11111111-1111-1111-1111-111111111111.txt",
@@ -177,25 +177,25 @@ class DocumentInstructionServiceTest {
         );
 
         assertThrows(BadRequestException.class,
-                () -> service.createInstruction(new DocumentInstructionCreateRequest("Title", null)));
+                () -> service.createInstruction(new CreateInstructionCommand("Title", null)));
     }
 
     private static class InMemoryMetadataRepository implements InstructionMetadataRepository {
 
-        private final Map<String, DocumentInstructionMetadata> items = new HashMap<>();
+        private final Map<String, InstructionMetadata> items = new HashMap<>();
 
         @Override
-        public void save(DocumentInstructionMetadata metadata) {
+        public void save(InstructionMetadata metadata) {
             items.put(metadata.id(), metadata);
         }
 
         @Override
-        public Optional<DocumentInstructionMetadata> findById(String instructionId) {
+        public Optional<InstructionMetadata> findById(String instructionId) {
             return Optional.ofNullable(items.get(instructionId));
         }
 
         @Override
-        public List<DocumentInstructionMetadata> findAll() {
+        public List<InstructionMetadata> findAll() {
             return List.copyOf(items.values());
         }
 

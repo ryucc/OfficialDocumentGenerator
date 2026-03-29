@@ -1,6 +1,6 @@
 package com.officialpapers.api.persistence;
 
-import com.officialpapers.api.model.DocumentInstructionMetadata;
+import com.officialpapers.domain.InstructionMetadata;
 import com.officialpapers.api.service.InstructionMetadataRepository;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -37,7 +37,7 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
     }
 
     @Override
-    public void save(DocumentInstructionMetadata metadata) {
+    public void save(InstructionMetadata metadata) {
         dynamoDbClient.putItem(PutItemRequest.builder()
                 .tableName(tableName)
                 .item(toItem(metadata))
@@ -45,7 +45,7 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
     }
 
     @Override
-    public Optional<DocumentInstructionMetadata> findById(String instructionId) {
+    public Optional<InstructionMetadata> findById(String instructionId) {
         Map<String, AttributeValue> item = dynamoDbClient.getItem(GetItemRequest.builder()
                         .tableName(tableName)
                         .key(Map.of(INSTRUCTION_ID, AttributeValue.builder().s(instructionId).build()))
@@ -60,7 +60,7 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
     }
 
     @Override
-    public List<DocumentInstructionMetadata> findAll() {
+    public List<InstructionMetadata> findAll() {
         ScanResponse response = dynamoDbClient.scan(ScanRequest.builder()
                 .tableName(tableName)
                 .build());
@@ -82,7 +82,7 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
                 .build());
     }
 
-    private Map<String, AttributeValue> toItem(DocumentInstructionMetadata metadata) {
+    private Map<String, AttributeValue> toItem(InstructionMetadata metadata) {
         return Map.of(
                 INSTRUCTION_ID, AttributeValue.builder().s(metadata.id()).build(),
                 TITLE, AttributeValue.builder().s(metadata.title()).build(),
@@ -92,8 +92,8 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
         );
     }
 
-    private DocumentInstructionMetadata fromItem(Map<String, AttributeValue> item) {
-        return new DocumentInstructionMetadata(
+    private InstructionMetadata fromItem(Map<String, AttributeValue> item) {
+        return new InstructionMetadata(
                 item.get(INSTRUCTION_ID).s(),
                 item.get(TITLE).s(),
                 item.get(S3_KEY).s(),

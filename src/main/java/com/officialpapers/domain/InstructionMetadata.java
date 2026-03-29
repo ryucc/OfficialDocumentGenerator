@@ -1,6 +1,6 @@
-package com.officialpapers.api.model;
+package com.officialpapers.domain;
 
-public record DocumentInstructionMetadata(
+public record InstructionMetadata(
         String id,
         String title,
         String s3Key,

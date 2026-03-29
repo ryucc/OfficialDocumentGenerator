@@ -2,15 +2,19 @@ package com.officialpapers.api.handler;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.officialpapers.api.model.DocumentInstruction;
-import com.officialpapers.api.model.DocumentInstructionMetadata;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.officialpapers.api.generated.model.DocumentInstruction;
 import com.officialpapers.api.service.DocumentInstructionService;
 import com.officialpapers.api.service.InstructionContentStore;
 import com.officialpapers.api.service.InstructionMetadataRepository;
+import com.officialpapers.domain.CreateInstructionCommand;
+import com.officialpapers.domain.InstructionMetadata;
+import com.officialpapers.domain.UpdateInstructionCommand;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -33,7 +37,7 @@ class DocumentInstructionHandlerTest {
             () -> "11111111-1111-1111-1111-111111111111"
     );
     private final DocumentInstructionHandler handler = new DocumentInstructionHandler(service);
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @Test
     void createInstructionReturnsCreatedResource() throws Exception {
@@ -47,16 +51,16 @@ class DocumentInstructionHandlerTest {
 
         assertEquals(201, response.getStatusCode());
         DocumentInstruction instruction = objectMapper.readValue(response.getBody(), DocumentInstruction.class);
-        assertEquals("11111111-1111-1111-1111-111111111111", instruction.id());
-        assertEquals("Scholarship", instruction.title());
-        assertEquals("Write formally", instruction.content());
-        assertEquals("2026-03-29T10:15:30Z", instruction.createdAt());
-        assertEquals("2026-03-29T10:15:30Z", instruction.updatedAt());
+        assertEquals("11111111-1111-1111-1111-111111111111", instruction.getId().toString());
+        assertEquals("Scholarship", instruction.getTitle());
+        assertEquals("Write formally", instruction.getContent());
+        assertEquals(OffsetDateTime.parse("2026-03-29T10:15:30Z"), instruction.getCreatedAt());
+        assertEquals(OffsetDateTime.parse("2026-03-29T10:15:30Z"), instruction.getUpdatedAt());
     }
 
     @Test
     void listInstructionsReturnsItemsEnvelope() throws Exception {
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "22222222-2222-2222-2222-222222222222",
                 "Letter",
                 "instructions/22222222-2222-2222-2222-222222222222.txt",
@@ -117,8 +121,23 @@ class DocumentInstructionHandlerTest {
     }
 
     @Test
+    void createInstructionRejectsNonStringFields() throws Exception {
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withHttpMethod("POST")
+                .withBody("""
+                        {"title":123,"content":"Valid"}
+                        """);
+
+        var response = handler.handleRequest(event, null);
+
+        assertEquals(400, response.getStatusCode());
+        Map<?, ?> payload = objectMapper.readValue(response.getBody(), Map.class);
+        assertEquals("title must be a string", payload.get("message"));
+    }
+
+    @Test
     void updateInstructionRejectsUnknownFields() throws Exception {
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "44444444-4444-4444-4444-444444444444",
                 "Essay",
                 "instructions/44444444-4444-4444-4444-444444444444.txt",
@@ -142,8 +161,33 @@ class DocumentInstructionHandlerTest {
     }
 
     @Test
+    void updateInstructionRejectsNonStringFields() throws Exception {
+        metadataRepository.save(new InstructionMetadata(
+                "55555555-5555-5555-5555-555555555555",
+                "Essay",
+                "instructions/55555555-5555-5555-5555-555555555555.txt",
+                "2026-03-29T10:15:30Z",
+                "2026-03-29T10:15:30Z"
+        ));
+        contentStore.put("instructions/55555555-5555-5555-5555-555555555555.txt", "Original");
+
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withHttpMethod("PUT")
+                .withPathParameters(Map.of("instructionId", "55555555-5555-5555-5555-555555555555"))
+                .withBody("""
+                        {"content":123}
+                        """);
+
+        var response = handler.handleRequest(event, null);
+
+        assertEquals(400, response.getStatusCode());
+        Map<?, ?> payload = objectMapper.readValue(response.getBody(), Map.class);
+        assertEquals("content must be a string", payload.get("message"));
+    }
+
+    @Test
     void deleteInstructionReturnsNoContent() {
-        metadataRepository.save(new DocumentInstructionMetadata(
+        metadataRepository.save(new InstructionMetadata(
                 "33333333-3333-3333-3333-333333333333",
                 "Essay",
                 "instructions/33333333-3333-3333-3333-333333333333.txt",
@@ -164,20 +208,20 @@ class DocumentInstructionHandlerTest {
 
     private static class InMemoryMetadataRepository implements InstructionMetadataRepository {
 
-        private final Map<String, DocumentInstructionMetadata> items = new HashMap<>();
+        private final Map<String, InstructionMetadata> items = new HashMap<>();
 
         @Override
-        public void save(DocumentInstructionMetadata metadata) {
+        public void save(InstructionMetadata metadata) {
             items.put(metadata.id(), metadata);
         }
 
         @Override
-        public Optional<DocumentInstructionMetadata> findById(String instructionId) {
+        public Optional<InstructionMetadata> findById(String instructionId) {
             return Optional.ofNullable(items.get(instructionId));
         }
 
         @Override
-        public List<DocumentInstructionMetadata> findAll() {
+        public List<InstructionMetadata> findAll() {
             return List.copyOf(items.values());
         }
 
