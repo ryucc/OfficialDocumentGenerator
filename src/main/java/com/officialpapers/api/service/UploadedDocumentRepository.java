@@ -9,9 +9,9 @@ public interface UploadedDocumentRepository {
 
     void save(UploadedDocument document);
 
-    Optional<UploadedDocument> findById(String documentId);
+    Optional<UploadedDocument> findById(String ownerUserId, String documentId);
 
-    List<UploadedDocument> findAll();
+    List<UploadedDocument> findAllByOwnerUserId(String ownerUserId);
 
-    void deleteById(String documentId);
+    void deleteById(String ownerUserId, String documentId);
 }

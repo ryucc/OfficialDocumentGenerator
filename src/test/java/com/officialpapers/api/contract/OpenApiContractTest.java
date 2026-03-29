@@ -11,20 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpenApiContractTest {
 
     @Test
-    void openApiServerBasePathMatchesSampleDocumentRoutes() throws IOException {
+    void openApiAndSamTemplateExposeSecuredDocumentRoutesAndAuthEndpoints() throws IOException {
         String openApi = Files.readString(Path.of("src/main/resources/openapi/openapi.yaml"));
-        String appTemplate = Files.readString(Path.of("infra/app-only.yaml"));
-        String buildSpec = Files.readString(Path.of("infra/buildspec.yaml"));
+        String samTemplate = Files.readString(Path.of("infra/template.yaml"));
 
         assertTrue(openApi.contains("url: http://127.0.0.1:3000/api/v1"));
-        assertTrue(openApi.contains("url: https://api.example.com/api/v1"));
-        assertTrue(openApi.contains("url: https://staging-api.example.com/api/v1"));
-        assertTrue(openApi.contains("/sample-documents:"));
+        assertTrue(openApi.contains("/auth/login:"));
+        assertTrue(openApi.contains("/auth/me:"));
         assertTrue(openApi.contains("/sample-documents/{documentId}/download-url:"));
-        assertTrue(appTemplate.contains("Path: /api/v1/sample-documents"));
-        assertTrue(appTemplate.contains("UPLOADED_DOCUMENT_METADATA_TABLE"));
-        assertTrue(appTemplate.contains("UPLOADED_DOCUMENT_BUCKET"));
-        assertTrue(appTemplate.contains("CorsConfiguration:"));
-        assertTrue(buildSpec.contains("infra/app-only.yaml"));
+        assertTrue(openApi.contains("CognitoBearerAuth:"));
+        assertTrue(openApi.contains("security:"));
+        assertTrue(openApi.contains("TooManyRequests:"));
+
+        assertTrue(samTemplate.contains("Path: /api/v1/auth/login"));
+        assertTrue(samTemplate.contains("Path: /api/v1/auth/me"));
+        assertTrue(samTemplate.contains("DefaultAuthorizer: CognitoAuthorizer"));
+        assertTrue(samTemplate.contains("AllowHeaders: \"'Content-Type,Authorization'\""));
+        assertTrue(samTemplate.contains("COGNITO_USER_POOL_CLIENT_ID"));
+        assertTrue(samTemplate.contains("AttributeName: ownerUserId"));
     }
 }

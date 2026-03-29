@@ -8,8 +8,8 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
+import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
+import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -20,6 +20,7 @@ import java.util.Optional;
 
 public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepository {
 
+    private static final String OWNER_USER_ID = "ownerUserId";
     private static final String DOCUMENT_ID = "documentId";
     private static final String FILENAME = "filename";
     private static final String CONTENT_TYPE = "contentType";
@@ -50,10 +51,13 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     }
 
     @Override
-    public Optional<UploadedDocument> findById(String documentId) {
+    public Optional<UploadedDocument> findById(String ownerUserId, String documentId) {
         Map<String, AttributeValue> item = dynamoDbClient.getItem(GetItemRequest.builder()
                         .tableName(tableName)
-                        .key(Map.of(DOCUMENT_ID, AttributeValue.builder().s(documentId).build()))
+                        .key(Map.of(
+                                OWNER_USER_ID, AttributeValue.builder().s(ownerUserId).build(),
+                                DOCUMENT_ID, AttributeValue.builder().s(documentId).build()
+                        ))
                         .consistentRead(true)
                         .build())
                 .item();
@@ -65,9 +69,13 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     }
 
     @Override
-    public List<UploadedDocument> findAll() {
-        ScanResponse response = dynamoDbClient.scan(ScanRequest.builder()
+    public List<UploadedDocument> findAllByOwnerUserId(String ownerUserId) {
+        QueryResponse response = dynamoDbClient.query(QueryRequest.builder()
                 .tableName(tableName)
+                .keyConditionExpression(OWNER_USER_ID + " = :ownerUserId")
+                .expressionAttributeValues(Map.of(
+                        ":ownerUserId", AttributeValue.builder().s(ownerUserId).build()
+                ))
                 .build());
 
         if (response.items() == null || response.items().isEmpty()) {
@@ -80,15 +88,19 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     }
 
     @Override
-    public void deleteById(String documentId) {
+    public void deleteById(String ownerUserId, String documentId) {
         dynamoDbClient.deleteItem(DeleteItemRequest.builder()
                 .tableName(tableName)
-                .key(Map.of(DOCUMENT_ID, AttributeValue.builder().s(documentId).build()))
+                .key(Map.of(
+                        OWNER_USER_ID, AttributeValue.builder().s(ownerUserId).build(),
+                        DOCUMENT_ID, AttributeValue.builder().s(documentId).build()
+                ))
                 .build());
     }
 
     private Map<String, AttributeValue> toItem(UploadedDocument document) {
         Map<String, AttributeValue> item = new HashMap<>();
+        item.put(OWNER_USER_ID, AttributeValue.builder().s(document.ownerUserId()).build());
         item.put(DOCUMENT_ID, AttributeValue.builder().s(document.id()).build());
         item.put(FILENAME, AttributeValue.builder().s(document.filename()).build());
         item.put(CONTENT_TYPE, AttributeValue.builder().s(document.contentType()).build());
@@ -105,6 +117,7 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     private UploadedDocument fromItem(Map<String, AttributeValue> item) {
         return new UploadedDocument(
                 item.get(DOCUMENT_ID).s(),
+                item.get(OWNER_USER_ID).s(),
                 item.get(FILENAME).s(),
                 item.get(CONTENT_TYPE).s(),
                 item.containsKey(SIZE_BYTES) ? Long.valueOf(item.get(SIZE_BYTES).n()) : null,

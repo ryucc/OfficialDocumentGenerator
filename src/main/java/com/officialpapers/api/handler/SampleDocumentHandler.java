@@ -12,10 +12,10 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.di.DaggerLambdaComponent;
 import com.officialpapers.api.di.LambdaComponent;
 import com.officialpapers.api.generated.model.CreateSampleDocumentRequest;
+import com.officialpapers.api.service.ApiException;
 import com.officialpapers.api.service.BadRequestException;
-import com.officialpapers.api.service.ConflictException;
-import com.officialpapers.api.service.NotFoundException;
 import com.officialpapers.api.service.UploadedDocumentService;
+import com.officialpapers.domain.AuthenticatedUser;
 
 import javax.inject.Inject;
 import java.util.Map;
@@ -28,6 +28,7 @@ public class SampleDocumentHandler implements RequestHandler<APIGatewayProxyRequ
 
     private final UploadedDocumentService documentService;
     private final SampleDocumentApiMapper apiMapper;
+    private final RequestAuthenticationResolver authenticationResolver;
     private final ObjectMapper objectMapper;
 
     public SampleDocumentHandler() {
@@ -35,21 +36,23 @@ public class SampleDocumentHandler implements RequestHandler<APIGatewayProxyRequ
     }
 
     private SampleDocumentHandler(SampleDocumentHandler delegate) {
-        this(delegate.documentService, delegate.apiMapper, delegate.objectMapper);
+        this(delegate.documentService, delegate.apiMapper, delegate.authenticationResolver, delegate.objectMapper);
     }
 
     public SampleDocumentHandler(UploadedDocumentService documentService) {
-        this(documentService, new SampleDocumentApiMapper(), defaultObjectMapper());
+        this(documentService, new SampleDocumentApiMapper(), new RequestAuthenticationResolver(), defaultObjectMapper());
     }
 
     @Inject
     public SampleDocumentHandler(
             UploadedDocumentService documentService,
             SampleDocumentApiMapper apiMapper,
+            RequestAuthenticationResolver authenticationResolver,
             ObjectMapper objectMapper
     ) {
         this.documentService = documentService;
         this.apiMapper = apiMapper;
+        this.authenticationResolver = authenticationResolver;
         this.objectMapper = objectMapper;
     }
 
@@ -62,32 +65,33 @@ public class SampleDocumentHandler implements RequestHandler<APIGatewayProxyRequ
 
             return switch (method) {
                 case "OPTIONS" -> apiMapper.toOptionsResponse();
-                case "GET" -> handleGet(path, pathParams);
+                case "GET" -> handleGet(event, path, pathParams);
                 case "POST" -> handlePost(event, path, pathParams);
-                case "DELETE" -> deleteDocument(pathParams);
+                case "DELETE" -> deleteDocument(event, pathParams);
                 default -> errorResponse(405, "METHOD_NOT_ALLOWED", "Method not allowed");
             };
-        } catch (BadRequestException exception) {
-            return errorResponse(400, "BAD_REQUEST", exception.getMessage());
-        } catch (ConflictException exception) {
-            return errorResponse(409, exception.code(), exception.getMessage());
-        } catch (NotFoundException exception) {
-            return errorResponse(404, "NOT_FOUND", exception.getMessage());
+        } catch (ApiException exception) {
+            return errorResponse(exception.statusCode(), exception.code(), exception.getMessage());
         } catch (Exception exception) {
             return errorResponse(500, "INTERNAL_SERVER_ERROR", "Internal server error");
         }
     }
 
-    private APIGatewayProxyResponseEvent handleGet(String path, Map<String, String> pathParams) {
+    private APIGatewayProxyResponseEvent handleGet(
+            APIGatewayProxyRequestEvent event,
+            String path,
+            Map<String, String> pathParams
+    ) {
+        AuthenticatedUser user = authenticationResolver.requireAuthenticatedUser(event);
         if (hasDocumentId(pathParams) && path.endsWith("/download-url")) {
             return jsonResponse(200, apiMapper.toApi(
-                    documentService.createDownloadTarget(requireDocumentId(pathParams))
+                    documentService.createDownloadTarget(user, requireDocumentId(pathParams))
             ));
         }
         if (hasDocumentId(pathParams)) {
-            return jsonResponse(200, apiMapper.toApi(documentService.getDocument(requireDocumentId(pathParams))));
+            return jsonResponse(200, apiMapper.toApi(documentService.getDocument(user, requireDocumentId(pathParams))));
         }
-        return jsonResponse(200, apiMapper.toApiList(documentService.listDocuments()));
+        return jsonResponse(200, apiMapper.toApiList(documentService.listDocuments(user)));
     }
 
     private APIGatewayProxyResponseEvent handlePost(
@@ -95,21 +99,29 @@ public class SampleDocumentHandler implements RequestHandler<APIGatewayProxyRequ
             String path,
             Map<String, String> pathParams
     ) {
+        AuthenticatedUser user = authenticationResolver.requireAuthenticatedUser(event);
         if (hasDocumentId(pathParams) && path.endsWith("/complete")) {
-            return jsonResponse(200, apiMapper.toApi(documentService.completeUpload(requireDocumentId(pathParams))));
+            return jsonResponse(200, apiMapper.toApi(documentService.completeUpload(user, requireDocumentId(pathParams))));
         }
         return jsonResponse(
                 201,
                 apiMapper.toApi(
                         documentService.createDocument(
+                                user,
                                 apiMapper.toDomain(readCreateBody(event))
                         )
                 )
         );
     }
 
-    private APIGatewayProxyResponseEvent deleteDocument(Map<String, String> pathParams) {
-        documentService.deleteDocument(requireDocumentId(pathParams));
+    private APIGatewayProxyResponseEvent deleteDocument(
+            APIGatewayProxyRequestEvent event,
+            Map<String, String> pathParams
+    ) {
+        documentService.deleteDocument(
+                authenticationResolver.requireAuthenticatedUser(event),
+                requireDocumentId(pathParams)
+        );
         return apiMapper.toNoContentResponse();
     }
 

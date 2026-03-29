@@ -20,7 +20,247 @@ Parameters:
     Type: String
     Description: ARN of the CodeStar connection to GitHub
 
+Globals:
+  Function:
+    Runtime: java21
+    MemorySize: 512
+    Timeout: 30
+
 Resources:
+
+  # ---- API ----
+  DocumentApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub official-doc-generator-api-${Stage}
+      StageName: Prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt DocumentUserPool.Arn
+
+  SampleDocumentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub sample-document-${Stage}
+      Handler: com.officialpapers.api.handler.SampleDocumentHandler
+      CodeUri: ../build/distributions/lambda.zip
+      Environment:
+        Variables:
+          UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
+          UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
+      Policies:
+        - Statement:
+            - Sid: UploadedDocumentMetadataAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+              Resource: !GetAtt UploadedDocumentTable.Arn
+            - Sid: UploadedDocumentObjectAccess
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/*
+      Events:
+        ListSampleDocuments:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents
+            Method: GET
+        CreateSampleDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents
+            Method: POST
+        GetSampleDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}
+            Method: GET
+        CompleteSampleDocumentUpload:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}/complete
+            Method: POST
+        GetSampleDocumentDownloadUrl:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}/download-url
+            Method: GET
+        DeleteSampleDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}
+            Method: DELETE
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub auth-${Stage}
+      Handler: com.officialpapers.api.handler.AuthHandler
+      CodeUri: ../build/distributions/lambda.zip
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref DocumentUserPool
+          COGNITO_USER_POOL_CLIENT_ID: !Ref DocumentUserPoolClient
+      Policies:
+        - Statement:
+            - Sid: CognitoAuthApiAccess
+              Effect: Allow
+              Action:
+                - cognito-idp:SignUp
+                - cognito-idp:ConfirmSignUp
+                - cognito-idp:ResendConfirmationCode
+                - cognito-idp:InitiateAuth
+                - cognito-idp:ForgotPassword
+                - cognito-idp:ConfirmForgotPassword
+                - cognito-idp:GlobalSignOut
+                - cognito-idp:RevokeToken
+                - cognito-idp:GetUser
+              Resource: !GetAtt DocumentUserPool.Arn
+      Events:
+        SignUp:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/signup
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ConfirmSignUp:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/confirm-signup
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ResendConfirmation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/resend-confirmation
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/login
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Refresh:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/refresh
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ForgotPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/forgot-password
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ConfirmForgotPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/confirm-forgot-password
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Logout:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/logout
+            Method: POST
+        GetCurrentUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/me
+            Method: GET
+
+  # ---- DynamoDB ----
+  UploadedDocumentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub sample-documents-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: ownerUserId
+          AttributeType: S
+        - AttributeName: documentId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ownerUserId
+          KeyType: HASH
+        - AttributeName: documentId
+          KeyType: RANGE
+
+  # ---- S3 ----
+  UploadedDocumentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 300
+
+  # ---- Cognito ----
+  DocumentUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub official-doc-generator-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+
+  DocumentUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub official-doc-generator-${Stage}-client
+      UserPoolId: !Ref DocumentUserPool
+      GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
   # ---- CodePipeline ----
   ArtifactBucket:
@@ -179,3 +419,24 @@ Resources:
                 ParameterOverrides: !Sub '{"Stage": "${Stage}"}'
               InputArtifacts:
                 - Name: BuildOutput
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway URL
+    Value: !Sub https://${DocumentApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/sample-documents
+  TableName:
+    Value: !Ref UploadedDocumentTable
+  BucketName:
+    Value: !Ref UploadedDocumentBucket
+  UploadedDocumentMetadataTableName:
+    Description: DynamoDB table for uploaded document metadata
+    Value: !Ref UploadedDocumentTable
+  UploadedDocumentBucketName:
+    Description: S3 bucket for uploaded source documents
+    Value: !Ref UploadedDocumentBucket
+  CognitoUserPoolId:
+    Description: Cognito user pool identifier
+    Value: !Ref DocumentUserPool
+  CognitoUserPoolClientId:
+    Description: Cognito user pool client identifier
+    Value: !Ref DocumentUserPoolClient

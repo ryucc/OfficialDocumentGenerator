@@ -1,15 +1,8 @@
 package com.officialpapers.api.service;
 
-public class ConflictException extends RuntimeException {
-
-    private final String code;
+public class ConflictException extends ApiException {
 
     public ConflictException(String code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public String code() {
-        return code;
+        super(409, code, message);
     }
 }
