@@ -109,7 +109,7 @@ Resources:
   BuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub official-doc-generator-build-${Stage}
+      Name: !Sub official-doc-generator-build-${Stage}-${AWS::StackName}
       ServiceRole: !GetAtt BuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -127,7 +127,7 @@ Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Sub official-doc-generator-${Stage}
+      Name: !Sub official-doc-generator-${Stage}-${AWS::StackName}
       RoleArn: !GetAtt PipelineRole.Arn
       ArtifactStore:
         Type: S3
