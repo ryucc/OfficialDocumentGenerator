@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useAuth } from './AuthContext'
 import { useNavigate } from 'react-router-dom'
+import './Login.css'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -20,35 +21,23 @@ export default function Login() {
       await login(email, password)
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed. Please check your credentials.')
+      setError(err instanceof Error ? err.message : '登入失敗，請檢查您的帳號密碼')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh',
-      padding: '20px',
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        padding: '40px',
-        border: '1px solid var(--border-color)',
-        borderRadius: '8px',
-        backgroundColor: 'var(--bg-color)',
-      }}>
-        <h1 style={{ marginBottom: '30px', textAlign: 'center' }}>登入</h1>
+    <div className="login-container">
+      <div className="login-card">
+        <div className="login-header">
+          <h1>官方文件產生器</h1>
+          <p className="login-subtitle">登入您的帳號</p>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="email" style={{ display: 'block', marginBottom: '8px' }}>
-              電子郵件
-            </label>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="email">電子郵件</label>
             <input
               id="email"
               type="email"
@@ -56,20 +45,13 @@ export default function Login() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                fontSize: '16px',
-              }}
+              placeholder="your@email.com"
+              className="form-input"
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="password" style={{ display: 'block', marginBottom: '8px' }}>
-              密碼
-            </label>
+          <div className="form-group">
+            <label htmlFor="password">密碼</label>
             <input
               id="password"
               type="password"
@@ -77,25 +59,18 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid var(--border-color)',
-                borderRadius: '4px',
-                fontSize: '16px',
-              }}
+              placeholder="••••••••"
+              className="form-input"
             />
           </div>
 
           {error && (
-            <div style={{
-              padding: '10px',
-              marginBottom: '20px',
-              backgroundColor: '#fee',
-              color: '#c00',
-              borderRadius: '4px',
-              fontSize: '14px',
-            }}>
+            <div className="error-message">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M8 4v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="8" cy="11" r="0.75" fill="currentColor"/>
+              </svg>
               {error}
             </div>
           )}
@@ -103,21 +78,22 @@ export default function Login() {
           <button
             type="submit"
             disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: 'var(--primary-color)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '16px',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.6 : 1,
-            }}
+            className="login-button"
           >
-            {isLoading ? '登入中...' : '登入'}
+            {isLoading ? (
+              <>
+                <span className="spinner"></span>
+                登入中...
+              </>
+            ) : (
+              '登入'
+            )}
           </button>
         </form>
+
+        <div className="login-footer">
+          <p>請使用管理員提供的帳號密碼登入</p>
+        </div>
       </div>
     </div>
   )
