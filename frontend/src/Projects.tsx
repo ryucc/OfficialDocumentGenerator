@@ -137,7 +137,7 @@ function Projects() {
           <thead>
             <tr>
               <th>郵件標題</th>
-              <th>生成文件</th>
+              <th>生成公文</th>
               <th>狀態</th>
               <th>建立時間</th>
               <th>更新時間</th>
