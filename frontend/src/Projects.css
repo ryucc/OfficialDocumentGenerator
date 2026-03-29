@@ -172,15 +172,6 @@
   color: var(--text);
 }
 
-.project-id code {
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-input);
-  border-radius: 4px;
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
 .status-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -219,6 +210,16 @@
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   color: var(--text);
+}
+
+.email-subject {
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
 }
 
 .email-bucket {
@@ -261,7 +262,7 @@
     padding: 0.75rem 0.5rem;
   }
 
-  .project-id code {
-    font-size: 0.75rem;
+  .email-subject {
+    max-width: 200px;
   }
 }

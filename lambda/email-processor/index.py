@@ -1,11 +1,35 @@
 import json
 import os
 import boto3
+import email
+from email import policy
 from datetime import datetime
 from uuid import uuid4
 
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
+
+
+def extract_email_subject(bucket, key):
+    """
+    Fetch email from S3 and extract the subject line.
+    Returns the subject or a default value if extraction fails.
+    """
+    try:
+        response = s3.get_object(Bucket=bucket, Key=key)
+        email_content = response['Body'].read()
+
+        # Parse email
+        msg = email.message_from_bytes(email_content, policy=policy.default)
+        subject = msg.get('Subject', 'Untitled Email')
+
+        # Decode subject if needed
+        if subject:
+            return str(subject).strip()
+        return 'Untitled Email'
+    except Exception as e:
+        print(f"Error extracting email subject: {str(e)}")
+        return 'Untitled Email'
 
 
 def lambda_handler(event, context):
@@ -34,6 +58,10 @@ def lambda_handler(event, context):
 
                 print(f"Processing email from S3: s3://{bucket}/{key}")
 
+                # Extract email subject
+                email_subject = extract_email_subject(bucket, key)
+                print(f"Email subject: {email_subject}")
+
                 # Generate project ID
                 project_id = str(uuid4())
                 timestamp = datetime.utcnow().isoformat()
@@ -41,6 +69,7 @@ def lambda_handler(event, context):
                 # Create project item in DynamoDB
                 item = {
                     'projectId': project_id,
+                    'name': email_subject,  # Initial name is email subject
                     'status': 'in_progress',
                     'emailS3Key': key,
                     'emailS3Bucket': bucket,

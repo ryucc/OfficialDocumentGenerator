@@ -4,6 +4,7 @@ import './Projects.css'
 
 interface Project {
   projectId: string
+  name: string
   status: string
   emailS3Key: string
   emailS3Bucket: string
@@ -124,13 +125,6 @@ function Projects() {
             <option value="in_progress">處理中</option>
             <option value="finished">已完成</option>
           </select>
-          <button onClick={fetchProjects} className="refresh-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            重新整理
-          </button>
         </div>
       </div>
 
@@ -143,10 +137,9 @@ function Projects() {
         <table className="projects-table">
           <thead>
             <tr>
-              <th>專案 ID</th>
+              <th>郵件標題</th>
+              <th>生成公文</th>
               <th>狀態</th>
-              <th>郵件</th>
-              <th>生成文件</th>
               <th>建立時間</th>
               <th>更新時間</th>
             </tr>
@@ -154,19 +147,10 @@ function Projects() {
           <tbody>
             {projects.map((project) => (
               <tr key={project.projectId}>
-                <td className="project-id">
-                  <code>{project.projectId.substring(0, 8)}...</code>
-                </td>
-                <td className="project-status">
-                  {getStatusBadge(project.status)}
-                </td>
                 <td className="project-email">
-                  <div className="email-info">
-                    <span className="email-file" title={project.emailS3Key}>
-                      {getEmailFileName(project.emailS3Key)}
-                    </span>
-                    <span className="email-bucket">{project.emailS3Bucket}</span>
-                  </div>
+                  <span className="email-subject" title={project.emailS3Key}>
+                    {project.name || getEmailFileName(project.emailS3Key)}
+                  </span>
                 </td>
                 <td className="project-document">
                   {project.generatedDocumentS3Key ? (
@@ -176,6 +160,9 @@ function Projects() {
                   ) : (
                     <span className="no-document">-</span>
                   )}
+                </td>
+                <td className="project-status">
+                  {getStatusBadge(project.status)}
                 </td>
                 <td className="project-date">
                   {formatDate(project.createdAt)}
