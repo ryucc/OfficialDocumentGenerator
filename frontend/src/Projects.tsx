@@ -4,6 +4,7 @@ import './Projects.css'
 
 interface Project {
   projectId: string
+  name: string
   status: string
   emailS3Key: string
   emailS3Bucket: string
@@ -148,7 +149,7 @@ function Projects() {
               <tr key={project.projectId}>
                 <td className="project-email">
                   <span className="email-subject" title={project.emailS3Key}>
-                    {getEmailFileName(project.emailS3Key)}
+                    {project.name || getEmailFileName(project.emailS3Key)}
                   </span>
                 </td>
                 <td className="project-document">
