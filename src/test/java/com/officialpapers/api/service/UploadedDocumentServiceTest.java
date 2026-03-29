@@ -97,7 +97,7 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void listDocumentsReturnsOnlyAvailableDocumentsForAuthenticatedUser() {
+    void listDocumentsReturnsOnlyAvailableDocumentsAcrossAllUsers() {
         repository.save(document(
                 USER.userId(),
                 "11111111-1111-1111-1111-111111111111",
@@ -134,23 +134,25 @@ class UploadedDocumentServiceTest {
         List<UploadedDocument> listed = service.listDocuments(USER);
 
         assertEquals(List.of(
+                "44444444-4444-4444-4444-444444444444",
                 "33333333-3333-3333-3333-333333333333",
                 "11111111-1111-1111-1111-111111111111"
         ), listed.stream().map(UploadedDocument::id).toList());
     }
 
     @Test
-    void getDocumentReturnsNotFoundForAnotherUsersDocument() {
-        repository.save(document(
+    void getDocumentReturnsAnotherUsersVisibleDocument() {
+        UploadedDocument otherUsersDocument = document(
                 OTHER_USER.userId(),
                 "11111111-1111-1111-1111-111111111111",
                 "other.pdf",
                 "2026-03-29T06:00:00Z",
                 "2026-03-29T06:10:00Z",
                 UploadedDocumentStatus.AVAILABLE
-        ));
+        );
+        repository.save(otherUsersDocument);
 
-        assertThrows(NotFoundException.class, () -> service.getDocument(USER, "11111111-1111-1111-1111-111111111111"));
+        assertEquals(otherUsersDocument, service.getDocument(USER, "11111111-1111-1111-1111-111111111111"));
     }
 
     @Test
@@ -277,6 +279,25 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
+    void createDownloadTargetReturnsPresignedDownloadForAnotherUsersVisibleDocument() {
+        UploadedDocument available = document(
+                OTHER_USER.userId(),
+                "aaaaaaaa-7777-7777-7777-777777777777",
+                "shared.pdf",
+                "2026-03-29T06:00:00Z",
+                "2026-03-29T06:10:00Z",
+                UploadedDocumentStatus.AVAILABLE
+        );
+        repository.save(available);
+        objectStore.objectSizes.put(available.sourceObjectKey(), 2048L);
+
+        DownloadTarget downloadTarget = service.createDownloadTarget(USER, available.id());
+
+        assertEquals("https://download.example.com/object", downloadTarget.downloadUrl());
+        assertEquals(available.sourceObjectKey(), objectStore.lastDownloadObjectKey);
+    }
+
+    @Test
     void deleteDocumentRemovesObjectBeforeMetadataAndTriggersRecompile() {
         UploadedDocument available = document(
                 USER.userId(),
@@ -365,9 +386,15 @@ class UploadedDocumentServiceTest {
         }
 
         @Override
-        public List<UploadedDocument> findAllByOwnerUserId(String ownerUserId) {
+        public Optional<UploadedDocument> findByDocumentId(String documentId) {
             return documents.values().stream()
-                    .filter(document -> document.ownerUserId().equals(ownerUserId))
+                    .filter(document -> document.id().equals(documentId))
+                    .findFirst();
+        }
+
+        @Override
+        public List<UploadedDocument> findAll() {
+            return documents.values().stream()
                     .sorted(Comparator.comparing(UploadedDocument::id))
                     .toList();
         }

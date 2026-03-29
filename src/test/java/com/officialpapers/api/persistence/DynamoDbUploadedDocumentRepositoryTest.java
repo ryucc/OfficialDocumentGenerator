@@ -14,13 +14,14 @@ import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
+import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
+import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -68,6 +69,28 @@ class DynamoDbUploadedDocumentRepositoryTest {
     }
 
     @Test
+    void findByDocumentIdReturnsMappedDocument() {
+        when(dynamoDbClient.scan(any(ScanRequest.class))).thenReturn(ScanResponse.builder()
+                .items(item())
+                .build());
+
+        UploadedDocument document = repository.findByDocumentId("11111111-1111-1111-1111-111111111111").orElseThrow();
+
+        assertEquals("user-123", document.ownerUserId());
+        assertEquals(UploadedDocumentStatus.AVAILABLE, document.status());
+
+        ArgumentCaptor<ScanRequest> captor = ArgumentCaptor.forClass(ScanRequest.class);
+        verify(dynamoDbClient).scan(captor.capture());
+        assertEquals("sample-documents-test", captor.getValue().tableName());
+        assertEquals("documentId = :documentId", captor.getValue().filterExpression());
+        assertEquals(
+                "11111111-1111-1111-1111-111111111111",
+                captor.getValue().expressionAttributeValues().get(":documentId").s()
+        );
+        assertTrue(Boolean.TRUE.equals(captor.getValue().consistentRead()));
+    }
+
+    @Test
     void findByIdReturnsEmptyWhenItemMissing() {
         when(dynamoDbClient.getItem(any(GetItemRequest.class))).thenReturn(GetItemResponse.builder().build());
 
@@ -75,48 +98,68 @@ class DynamoDbUploadedDocumentRepositoryTest {
     }
 
     @Test
-    void findAllByOwnerUserIdQueriesConfiguredTable() {
-        when(dynamoDbClient.query(any(QueryRequest.class))).thenReturn(QueryResponse.builder()
-                .items(item(), item())
-                .build());
+    void findByDocumentIdReturnsEmptyWhenItemMissing() {
+        when(dynamoDbClient.scan(any(ScanRequest.class))).thenReturn(ScanResponse.builder().build());
 
-        List<UploadedDocument> documents = repository.findAllByOwnerUserId("user-123");
-
-        assertEquals(2, documents.size());
-
-        ArgumentCaptor<QueryRequest> captor = ArgumentCaptor.forClass(QueryRequest.class);
-        verify(dynamoDbClient).query(captor.capture());
-        assertEquals("sample-documents-test", captor.getValue().tableName());
-        assertEquals("ownerUserId = :ownerUserId", captor.getValue().keyConditionExpression());
-        assertEquals("user-123", captor.getValue().expressionAttributeValues().get(":ownerUserId").s());
-        assertEquals(true, captor.getValue().consistentRead());
+        assertTrue(repository.findByDocumentId("11111111-1111-1111-1111-111111111111").isEmpty());
     }
 
     @Test
-    void findAllByOwnerUserIdReadsAllPages() {
+    void findByDocumentIdRejectsDuplicateMatches() {
+        when(dynamoDbClient.scan(any(ScanRequest.class))).thenReturn(ScanResponse.builder()
+                .items(item(), item())
+                .build());
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> repository.findByDocumentId("11111111-1111-1111-1111-111111111111")
+        );
+
+        assertEquals("Expected at most one document for id 11111111-1111-1111-1111-111111111111", exception.getMessage());
+    }
+
+    @Test
+    void findAllScansConfiguredTable() {
+        when(dynamoDbClient.scan(any(ScanRequest.class))).thenReturn(ScanResponse.builder()
+                .items(item(), item())
+                .build());
+
+        List<UploadedDocument> documents = repository.findAll();
+
+        assertEquals(2, documents.size());
+
+        ArgumentCaptor<ScanRequest> captor = ArgumentCaptor.forClass(ScanRequest.class);
+        verify(dynamoDbClient).scan(captor.capture());
+        assertEquals("sample-documents-test", captor.getValue().tableName());
+        assertEquals(null, captor.getValue().filterExpression());
+        assertTrue(Boolean.TRUE.equals(captor.getValue().consistentRead()));
+    }
+
+    @Test
+    void findAllReadsAllPages() {
         Map<String, AttributeValue> pageToken = Map.of(
                 "ownerUserId", AttributeValue.builder().s("user-123").build(),
                 "documentId", AttributeValue.builder().s("11111111-1111-1111-1111-111111111111").build()
         );
-        when(dynamoDbClient.query(any(QueryRequest.class))).thenReturn(
-                QueryResponse.builder()
+        when(dynamoDbClient.scan(any(ScanRequest.class))).thenReturn(
+                ScanResponse.builder()
                         .items(item())
                         .lastEvaluatedKey(pageToken)
                         .build(),
-                QueryResponse.builder()
+                ScanResponse.builder()
                         .items(secondItem())
                         .build()
         );
 
-        List<UploadedDocument> documents = repository.findAllByOwnerUserId("user-123");
+        List<UploadedDocument> documents = repository.findAll();
 
         assertEquals(List.of(
                 "11111111-1111-1111-1111-111111111111",
                 "22222222-2222-2222-2222-222222222222"
         ), documents.stream().map(UploadedDocument::id).toList());
 
-        ArgumentCaptor<QueryRequest> captor = ArgumentCaptor.forClass(QueryRequest.class);
-        verify(dynamoDbClient, times(2)).query(captor.capture());
+        ArgumentCaptor<ScanRequest> captor = ArgumentCaptor.forClass(ScanRequest.class);
+        verify(dynamoDbClient, times(2)).scan(captor.capture());
         assertEquals(pageToken, captor.getAllValues().get(1).exclusiveStartKey());
     }
 

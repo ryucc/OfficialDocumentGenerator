@@ -66,7 +66,8 @@ public class UploadedDocumentService {
     }
 
     public List<UploadedDocument> listDocuments(AuthenticatedUser user) {
-        return repository.findAllByOwnerUserId(requireUserId(user)).stream()
+        requireUserId(user);
+        return repository.findAll().stream()
                 .filter(document -> document.status() == UploadedDocumentStatus.AVAILABLE)
                 .sorted(UPDATED_AT_DESC)
                 .toList();
@@ -99,7 +100,7 @@ public class UploadedDocumentService {
     }
 
     public UploadedDocument getDocument(AuthenticatedUser user, String documentId) {
-        return findDocument(user, documentId);
+        return findVisibleDocument(user, documentId);
     }
 
     public UploadedDocument completeUpload(AuthenticatedUser user, String documentId) {
@@ -154,7 +155,7 @@ public class UploadedDocumentService {
     }
 
     public DownloadTarget createDownloadTarget(AuthenticatedUser user, String documentId) {
-        UploadedDocument existing = findDocument(user, documentId);
+        UploadedDocument existing = findVisibleDocument(user, documentId);
         if (existing.status() != UploadedDocumentStatus.AVAILABLE) {
             throw new ConflictException("DOCUMENT_NOT_READY", "Document is not ready for download");
         }
@@ -165,7 +166,7 @@ public class UploadedDocumentService {
     }
 
     public void deleteDocument(AuthenticatedUser user, String documentId) {
-        UploadedDocument existing = findDocument(user, documentId);
+        UploadedDocument existing = findOwnedDocument(user, documentId);
         try {
             objectStore.delete(existing.sourceObjectKey());
         } catch (RuntimeException exception) {
@@ -175,8 +176,14 @@ public class UploadedDocumentService {
         triggerRecompileQuietly();
     }
 
-    private UploadedDocument findDocument(AuthenticatedUser user, String documentId) {
+    private UploadedDocument findOwnedDocument(AuthenticatedUser user, String documentId) {
         return repository.findById(requireUserId(user), documentId)
+                .orElseThrow(() -> new NotFoundException("Document not found"));
+    }
+
+    private UploadedDocument findVisibleDocument(AuthenticatedUser user, String documentId) {
+        requireUserId(user);
+        return repository.findByDocumentId(documentId)
                 .orElseThrow(() -> new NotFoundException("Document not found"));
     }
 

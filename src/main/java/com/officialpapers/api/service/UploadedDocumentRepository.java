@@ -11,7 +11,9 @@ public interface UploadedDocumentRepository {
 
     Optional<UploadedDocument> findById(String ownerUserId, String documentId);
 
-    List<UploadedDocument> findAllByOwnerUserId(String ownerUserId);
+    Optional<UploadedDocument> findByDocumentId(String documentId);
+
+    List<UploadedDocument> findAll();
 
     void deleteById(String ownerUserId, String documentId);
 }
