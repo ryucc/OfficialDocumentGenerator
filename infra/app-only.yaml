@@ -127,6 +127,7 @@ Resources:
 
   UploadedDocumentBucket:
     Type: AWS::S3::Bucket
+    DependsOn: EmailProcessingQueuePolicy
     Properties:
       CorsConfiguration:
         CorsRules:
@@ -285,8 +286,8 @@ Resources:
               - sqs:SendMessage
             Resource: !GetAtt EmailProcessingQueue.Arn
             Condition:
-              ArnEquals:
-                aws:SourceArn: !GetAtt UploadedDocumentBucket.Arn
+              StringLike:
+                aws:SourceArn: !Sub arn:aws:s3:::official-doc-generator-app-*
 
   # Lambda function to process emails and create projects
   EmailProcessorFunction:
