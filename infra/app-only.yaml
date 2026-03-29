@@ -113,6 +113,65 @@ Resources:
             Path: /api/v1/sample-documents/{documentId}
             Method: DELETE
 
+  TextExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub text-extractor-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/text-extractor
+      Timeout: 60
+      MemorySize: 1024
+      Environment:
+        Variables:
+          UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+        - Statement:
+            - Sid: S3WriteAccess
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/*
+            - Sid: DynamoDBUpdateAccess
+              Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: !GetAtt UploadedDocumentTable.Arn
+            - Sid: TextractAccess
+              Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: '*'
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/text-extractor-${Stage}:*
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref UploadedDocumentBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: sample-documents/
+
+  TextExtractorFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref TextExtractorFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !GetAtt UploadedDocumentBucket.Arn
+
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table
     Properties:

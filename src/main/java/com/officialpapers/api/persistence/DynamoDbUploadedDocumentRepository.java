@@ -26,6 +26,7 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     private static final String SIZE_BYTES = "sizeBytes";
     private static final String STATUS = "status";
     private static final String SOURCE_OBJECT_KEY = "sourceObjectKey";
+    private static final String TEXT_OBJECT_KEY = "textObjectKey";
     private static final String CREATED_AT = "createdAt";
     private static final String UPDATED_AT = "updatedAt";
 
@@ -99,6 +100,9 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
         if (document.sizeBytes() != null) {
             item.put(SIZE_BYTES, AttributeValue.builder().n(document.sizeBytes().toString()).build());
         }
+        if (document.textObjectKey() != null) {
+            item.put(TEXT_OBJECT_KEY, AttributeValue.builder().s(document.textObjectKey()).build());
+        }
         return item;
     }
 
@@ -110,6 +114,7 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
                 item.containsKey(SIZE_BYTES) ? Long.valueOf(item.get(SIZE_BYTES).n()) : null,
                 UploadedDocumentStatus.valueOf(item.get(STATUS).s()),
                 item.get(SOURCE_OBJECT_KEY).s(),
+                item.containsKey(TEXT_OBJECT_KEY) ? item.get(TEXT_OBJECT_KEY).s() : null,
                 item.get(CREATED_AT).s(),
                 item.get(UPDATED_AT).s()
         );

@@ -48,6 +48,7 @@ public class SampleDocumentApiMapper {
                 .contentType(document.contentType())
                 .sizeBytes(document.sizeBytes())
                 .status(SampleDocumentStatus.fromValue(document.status().name()))
+                .textObjectKey(document.textObjectKey())
                 .createdAt(OffsetDateTime.parse(document.createdAt()))
                 .updatedAt(OffsetDateTime.parse(document.updatedAt()));
     }

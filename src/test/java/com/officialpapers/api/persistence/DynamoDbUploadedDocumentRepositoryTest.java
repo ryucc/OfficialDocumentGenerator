@@ -121,6 +121,7 @@ class DynamoDbUploadedDocumentRepositoryTest {
                 512L,
                 UploadedDocumentStatus.AVAILABLE,
                 "sample-documents/11111111-1111-1111-1111-111111111111/memo.pdf",
+                null,
                 "2026-03-29T06:00:00Z",
                 "2026-03-29T06:10:00Z"
         );

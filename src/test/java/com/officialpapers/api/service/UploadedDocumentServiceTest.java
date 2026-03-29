@@ -295,6 +295,7 @@ class UploadedDocumentServiceTest {
                 256L,
                 status,
                 "sample-documents/" + id + "/" + filename,
+                null,
                 createdAt,
                 updatedAt
         );
