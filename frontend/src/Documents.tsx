@@ -6,7 +6,7 @@ interface Document {
   id: string
   filename: string
   contentType: string
-  sizeBytes: number
+  sizeBytes: number | null
   status: string
   createdAt: string
   updatedAt: string
@@ -66,6 +66,17 @@ function Documents() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
+
+  const isVisibleDocument = (
+    doc: Document,
+  ): doc is Document & { status: 'AVAILABLE'; sizeBytes: number } => {
+    return doc.status === 'AVAILABLE'
+      && typeof doc.sizeBytes === 'number'
+      && Number.isFinite(doc.sizeBytes)
+      && doc.sizeBytes > 0
+  }
+
+  const visibleDocuments = documents.filter(isVisibleDocument)
 
   const handleDownload = async (doc: Document) => {
     try {
@@ -147,6 +158,7 @@ function Documents() {
         body: JSON.stringify({
           filename: file.name,
           contentType: contentType,
+          sizeBytes: file.size,
         }),
       })
 
@@ -173,7 +185,7 @@ function Documents() {
       })
 
       if (!completeResponse.ok) {
-        console.warn('Failed to mark upload as complete')
+        throw new Error('檔案已上傳，但無法完成整理，請重新整理後再試')
       }
 
       // Refresh document list
@@ -238,7 +250,7 @@ function Documents() {
         />
       </div>
 
-      {documents.length === 0 ? (
+      {visibleDocuments.length === 0 ? (
         <div className="empty-state">
           <p>目前沒有文件</p>
         </div>
@@ -254,7 +266,7 @@ function Documents() {
             </tr>
           </thead>
           <tbody>
-            {documents.map((doc) => (
+            {visibleDocuments.map((doc) => (
               <tr key={doc.id}>
                 <td className="doc-name">
                   <div className="doc-name-content">

@@ -41,13 +41,15 @@ class UploadedDocumentServiceTest {
 
     private InMemoryUploadedDocumentRepository repository;
     private FakeUploadedDocumentObjectStore objectStore;
+    private List<String> deleteOperations;
     private InstructionRecompileTrigger recompileTrigger;
     private UploadedDocumentService service;
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryUploadedDocumentRepository();
-        objectStore = new FakeUploadedDocumentObjectStore();
+        deleteOperations = new ArrayList<>();
+        repository = new InMemoryUploadedDocumentRepository(deleteOperations);
+        objectStore = new FakeUploadedDocumentObjectStore(deleteOperations);
         recompileTrigger = mock(InstructionRecompileTrigger.class);
         service = new UploadedDocumentService(
                 repository,
@@ -246,7 +248,7 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void deleteDocumentRemovesMetadataAndObjectAndTriggersRecompile() {
+    void deleteDocumentRemovesObjectBeforeMetadataAndTriggersRecompile() {
         UploadedDocument available = document(
                 USER.userId(),
                 "88888888-8888-8888-8888-888888888888",
@@ -261,6 +263,10 @@ class UploadedDocumentServiceTest {
 
         assertTrue(repository.findById(USER.userId(), available.id()).isEmpty());
         assertEquals(List.of(available.sourceObjectKey()), objectStore.deletedKeys);
+        assertEquals(List.of(
+                "objectStore:" + available.sourceObjectKey(),
+                "repository:" + USER.userId() + "#" + available.id()
+        ), deleteOperations);
         verify(recompileTrigger).requestRecompile();
     }
 
@@ -284,6 +290,8 @@ class UploadedDocumentServiceTest {
 
         assertEquals("Failed to delete uploaded object", exception.getMessage());
         assertInstanceOf(IllegalStateException.class, exception.getCause());
+        assertTrue(repository.findById(USER.userId(), available.id()).isPresent());
+        assertTrue(objectStore.deletedKeys.isEmpty());
         verifyNoInteractions(recompileTrigger);
     }
 
@@ -311,6 +319,11 @@ class UploadedDocumentServiceTest {
     private static final class InMemoryUploadedDocumentRepository implements UploadedDocumentRepository {
 
         private final Map<String, UploadedDocument> documents = new LinkedHashMap<>();
+        private final List<String> deleteOperations;
+
+        private InMemoryUploadedDocumentRepository(List<String> deleteOperations) {
+            this.deleteOperations = deleteOperations;
+        }
 
         @Override
         public void save(UploadedDocument document) {
@@ -332,6 +345,7 @@ class UploadedDocumentServiceTest {
 
         @Override
         public void deleteById(String ownerUserId, String documentId) {
+            deleteOperations.add("repository:" + key(ownerUserId, documentId));
             documents.remove(key(ownerUserId, documentId));
         }
 
@@ -344,11 +358,16 @@ class UploadedDocumentServiceTest {
 
         private final Map<String, Long> objectSizes = new HashMap<>();
         private final List<String> deletedKeys = new ArrayList<>();
+        private final List<String> deleteOperations;
         private RuntimeException deleteException;
         private String lastUploadObjectKey;
         private Duration lastUploadExpiry;
         private String lastDownloadObjectKey;
         private int getObjectSizeCalls;
+
+        private FakeUploadedDocumentObjectStore(List<String> deleteOperations) {
+            this.deleteOperations = deleteOperations;
+        }
 
         @Override
         public UploadTarget createUploadTarget(String objectKey, String contentType, Duration expiry) {
@@ -383,6 +402,7 @@ class UploadedDocumentServiceTest {
             if (deleteException != null) {
                 throw deleteException;
             }
+            deleteOperations.add("objectStore:" + objectKey);
             deletedKeys.add(objectKey);
         }
     }

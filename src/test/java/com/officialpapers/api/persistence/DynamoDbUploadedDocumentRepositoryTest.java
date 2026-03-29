@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,6 +89,35 @@ class DynamoDbUploadedDocumentRepositoryTest {
         assertEquals("sample-documents-test", captor.getValue().tableName());
         assertEquals("ownerUserId = :ownerUserId", captor.getValue().keyConditionExpression());
         assertEquals("user-123", captor.getValue().expressionAttributeValues().get(":ownerUserId").s());
+        assertEquals(true, captor.getValue().consistentRead());
+    }
+
+    @Test
+    void findAllByOwnerUserIdReadsAllPages() {
+        Map<String, AttributeValue> pageToken = Map.of(
+                "ownerUserId", AttributeValue.builder().s("user-123").build(),
+                "documentId", AttributeValue.builder().s("11111111-1111-1111-1111-111111111111").build()
+        );
+        when(dynamoDbClient.query(any(QueryRequest.class))).thenReturn(
+                QueryResponse.builder()
+                        .items(item())
+                        .lastEvaluatedKey(pageToken)
+                        .build(),
+                QueryResponse.builder()
+                        .items(secondItem())
+                        .build()
+        );
+
+        List<UploadedDocument> documents = repository.findAllByOwnerUserId("user-123");
+
+        assertEquals(List.of(
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222"
+        ), documents.stream().map(UploadedDocument::id).toList());
+
+        ArgumentCaptor<QueryRequest> captor = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(dynamoDbClient, times(2)).query(captor.capture());
+        assertEquals(pageToken, captor.getAllValues().get(1).exclusiveStartKey());
     }
 
     @Test
@@ -128,6 +158,20 @@ class DynamoDbUploadedDocumentRepositoryTest {
                 "sourceObjectKey", AttributeValue.builder().s("sample-documents/user-123/11111111-1111-1111-1111-111111111111/memo.pdf").build(),
                 "createdAt", AttributeValue.builder().s("2026-03-29T06:00:00Z").build(),
                 "updatedAt", AttributeValue.builder().s("2026-03-29T06:10:00Z").build()
+        );
+    }
+
+    private static Map<String, AttributeValue> secondItem() {
+        return Map.of(
+                "ownerUserId", AttributeValue.builder().s("user-123").build(),
+                "documentId", AttributeValue.builder().s("22222222-2222-2222-2222-222222222222").build(),
+                "filename", AttributeValue.builder().s("memo-2.pdf").build(),
+                "contentType", AttributeValue.builder().s("application/pdf").build(),
+                "sizeBytes", AttributeValue.builder().n("256").build(),
+                "status", AttributeValue.builder().s("PENDING_UPLOAD").build(),
+                "sourceObjectKey", AttributeValue.builder().s("sample-documents/user-123/22222222-2222-2222-2222-222222222222/memo-2.pdf").build(),
+                "createdAt", AttributeValue.builder().s("2026-03-29T06:15:00Z").build(),
+                "updatedAt", AttributeValue.builder().s("2026-03-29T06:20:00Z").build()
         );
     }
 }

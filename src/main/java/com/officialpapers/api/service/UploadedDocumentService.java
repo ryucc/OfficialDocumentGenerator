@@ -141,12 +141,12 @@ public class UploadedDocumentService {
 
     public void deleteDocument(AuthenticatedUser user, String documentId) {
         UploadedDocument existing = findDocument(user, documentId);
-        repository.deleteById(existing.ownerUserId(), documentId);
         try {
             objectStore.delete(existing.sourceObjectKey());
         } catch (RuntimeException exception) {
             throw new IllegalStateException("Failed to delete uploaded object", exception);
         }
+        repository.deleteById(existing.ownerUserId(), documentId);
         triggerRecompileQuietly();
     }
 

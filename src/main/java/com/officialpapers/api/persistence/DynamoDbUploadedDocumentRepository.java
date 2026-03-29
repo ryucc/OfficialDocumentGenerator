@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,19 +71,29 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
 
     @Override
     public List<UploadedDocument> findAllByOwnerUserId(String ownerUserId) {
-        QueryResponse response = dynamoDbClient.query(QueryRequest.builder()
-                .tableName(tableName)
-                .keyConditionExpression(OWNER_USER_ID + " = :ownerUserId")
-                .expressionAttributeValues(Map.of(
-                        ":ownerUserId", AttributeValue.builder().s(ownerUserId).build()
-                ))
-                .build());
+        Map<String, AttributeValue> expressionAttributeValues = Map.of(
+                ":ownerUserId", AttributeValue.builder().s(ownerUserId).build()
+        );
+        List<Map<String, AttributeValue>> items = new ArrayList<>();
+        Map<String, AttributeValue> exclusiveStartKey = null;
 
-        if (response.items() == null || response.items().isEmpty()) {
-            return List.of();
-        }
+        do {
+            QueryRequest.Builder request = QueryRequest.builder()
+                    .tableName(tableName)
+                    .keyConditionExpression(OWNER_USER_ID + " = :ownerUserId")
+                    .expressionAttributeValues(expressionAttributeValues)
+                    .consistentRead(true);
+            if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
+                request.exclusiveStartKey(exclusiveStartKey);
+            }
+            QueryResponse response = dynamoDbClient.query(request.build());
+            if (response.items() != null && !response.items().isEmpty()) {
+                items.addAll(response.items());
+            }
+            exclusiveStartKey = response.lastEvaluatedKey();
+        } while (exclusiveStartKey != null && !exclusiveStartKey.isEmpty());
 
-        return response.items().stream()
+        return items.stream()
                 .map(this::fromItem)
                 .toList();
     }
