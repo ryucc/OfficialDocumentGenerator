@@ -51,6 +51,7 @@ Resources:
         Variables:
           UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
           UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
+          RULES_COMPILER_FUNCTION_NAME: !Ref RulesCompilerFunction
       Policies:
         - Statement:
             - Sid: UploadedDocumentMetadataAccess
@@ -68,6 +69,11 @@ Resources:
                 - s3:PutObject
                 - s3:DeleteObject
               Resource: !Sub ${UploadedDocumentBucket.Arn}/*
+            - Sid: InvokeRulesCompiler
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt RulesCompilerFunction.Arn
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
@@ -125,6 +131,7 @@ Resources:
       Environment:
         Variables:
           UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
+          RULES_COMPILER_FUNCTION_NAME: !Ref RulesCompilerFunction
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref UploadedDocumentBucket
@@ -144,6 +151,11 @@ Resources:
               Action:
                 - textract:DetectDocumentText
               Resource: '*'
+            - Sid: InvokeRulesCompiler
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt RulesCompilerFunction.Arn
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
@@ -171,6 +183,38 @@ Resources:
       Principal: s3.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
       SourceArn: !GetAtt UploadedDocumentBucket.Arn
+
+  RulesCompilerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub rules-compiler-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/rules-compiler
+      Timeout: 120
+      MemorySize: 512
+      Environment:
+        Variables:
+          UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
+          UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref UploadedDocumentTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+        - Statement:
+            - Sid: S3WriteGongwenInstructions
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/gongwen-instructions/*
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rules-compiler-${Stage}:*
 
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table

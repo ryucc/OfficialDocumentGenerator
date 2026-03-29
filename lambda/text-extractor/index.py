@@ -7,6 +7,7 @@ from urllib.parse import unquote_plus
 s3 = boto3.client('s3')
 textract = boto3.client('textract')
 dynamodb = boto3.resource('dynamodb')
+lambda_client = boto3.client('lambda')
 
 
 def lambda_handler(event, context):
@@ -52,6 +53,9 @@ def lambda_handler(event, context):
 
         # Update DynamoDB with textObjectKey
         update_metadata(key, txt_key)
+
+        # Trigger rules compilation (async)
+        trigger_rules_compilation()
 
         return {
             'statusCode': 200,
@@ -204,3 +208,23 @@ def update_metadata(document_key, txt_key):
     except Exception as e:
         print(f"Error updating metadata: {str(e)}")
         # Don't raise - metadata update failure shouldn't fail the whole process
+
+
+def trigger_rules_compilation():
+    """Trigger the rules compiler Lambda asynchronously."""
+    function_name = os.environ.get('RULES_COMPILER_FUNCTION_NAME')
+    if not function_name:
+        print("RULES_COMPILER_FUNCTION_NAME not set, skipping rules compilation")
+        return
+
+    try:
+        # Invoke asynchronously (Event invocation type)
+        lambda_client.invoke(
+            FunctionName=function_name,
+            InvocationType='Event',  # Async invocation
+            Payload=json.dumps({})
+        )
+        print(f"Triggered rules compilation: {function_name}")
+    except Exception as e:
+        print(f"Error triggering rules compilation: {str(e)}")
+        # Don't raise - compilation trigger failure shouldn't fail the extraction

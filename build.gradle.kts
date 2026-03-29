@@ -25,6 +25,7 @@ dependencies {
     implementation(platform("software.amazon.awssdk:bom:2.25.29"))
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:lambda")
     compileOnly("jakarta.annotation:jakarta.annotation-api:2.1.1")
     annotationProcessor("com.google.dagger:dagger-compiler:2.51.1")
 

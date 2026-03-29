@@ -6,12 +6,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.persistence.DynamoDbUploadedDocumentRepository;
 import com.officialpapers.api.persistence.S3UploadedDocumentObjectStore;
 import com.officialpapers.api.service.InstructionRecompileTrigger;
-import com.officialpapers.api.service.NoOpInstructionRecompileTrigger;
+import com.officialpapers.api.service.LambdaInstructionRecompileTrigger;
 import com.officialpapers.api.service.UploadedDocumentObjectStore;
 import com.officialpapers.api.service.UploadedDocumentRepository;
 import dagger.Module;
 import dagger.Provides;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
@@ -55,9 +56,21 @@ public interface LambdaModule {
     }
 
     @Provides
+    @Singleton
+    static LambdaClient provideLambdaClient() {
+        return LambdaClient.create();
+    }
+
+    @Provides
     @Named("uploadedDocumentMetadataTable")
     static String provideUploadedDocumentMetadataTableName() {
         return requireEnvironmentVariable("UPLOADED_DOCUMENT_METADATA_TABLE");
+    }
+
+    @Provides
+    @Named("rulesCompilerFunctionName")
+    static String provideRulesCompilerFunctionName() {
+        return requireEnvironmentVariable("RULES_COMPILER_FUNCTION_NAME");
     }
 
     @Provides
@@ -85,7 +98,7 @@ public interface LambdaModule {
     @Provides
     @Singleton
     static InstructionRecompileTrigger provideInstructionRecompileTrigger(
-            NoOpInstructionRecompileTrigger trigger
+            LambdaInstructionRecompileTrigger trigger
     ) {
         return trigger;
     }
