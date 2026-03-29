@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Default: test
     AllowedValues: [test]
+  AllowedEmailSenders:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Comma-separated list of allowed sender email addresses for ai@gongwengpt.click (leave empty to allow all)
 
 Globals:
   Function:
@@ -118,6 +122,30 @@ Resources:
             ExposedHeaders:
               - ETag
             MaxAge: 300
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldEmails
+            Status: Enabled
+            ExpirationInDays: 90
+            Prefix: emails/
+
+  # Bucket policy to allow SES to write emails to the shared bucket
+  UploadedDocumentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UploadedDocumentBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowSESPuts
+            Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action:
+              - s3:PutObject
+            Resource: !Sub ${UploadedDocumentBucket.Arn}/emails/*
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
 
   DocumentUserPool:
     Type: AWS::Cognito::UserPool
@@ -134,6 +162,111 @@ Resources:
       ClientName: !Sub official-doc-generator-${Stage}-client
       UserPoolId: !Ref DocumentUserPool
       GenerateSecret: false
+
+  # ---- Email Pipeline Resources ----
+
+  # Lambda function to filter incoming emails by allowlist
+  EmailFilterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub email-filter-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/email-filter
+      Timeout: 30
+      Environment:
+        Variables:
+          ALLOWED_SENDERS: !Join [',', !Ref AllowedEmailSenders]
+          EMAIL_BUCKET: !Ref UploadedDocumentBucket
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+
+  # Lambda permission for SES to invoke the filter function
+  EmailFilterFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmailFilterFunction
+      Action: lambda:InvokeFunction
+      Principal: ses.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  # DynamoDB table to track received emails
+  ReceivedEmailTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub received-emails-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: messageId
+          AttributeType: S
+        - AttributeName: receivedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: messageId
+          KeyType: HASH
+        - AttributeName: receivedAt
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Lambda function to log email metadata
+  EmailMetadataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub email-metadata-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/email-metadata
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ReceivedEmailTable
+          EMAIL_BUCKET: !Ref UploadedDocumentBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReceivedEmailTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref UploadedDocumentBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: !Sub emails/${Stage}/
+
+  # SES Receipt Rule Set
+  EmailReceiptRuleSet:
+    Type: AWS::SES::ReceiptRuleSet
+    Properties:
+      RuleSetName: !Sub gongwengpt-email-rules-${Stage}
+
+  # SES Receipt Rule
+  EmailReceiptRule:
+    Type: AWS::SES::ReceiptRule
+    Properties:
+      RuleSetName: !Ref EmailReceiptRuleSet
+      Rule:
+        Name: !Sub receive-ai-emails-${Stage}
+        Enabled: true
+        ScanEnabled: true
+        Recipients:
+          - ai@gongwengpt.click
+        Actions:
+          # First: Filter by Lambda
+          - LambdaAction:
+              FunctionArn: !GetAtt EmailFilterFunction.Arn
+              InvocationType: RequestResponse
+          # Second: Save to S3 (only if Lambda returns CONTINUE)
+          - S3Action:
+              BucketName: !Ref UploadedDocumentBucket
+              ObjectKeyPrefix: !Sub emails/${Stage}/
 
 Outputs:
   ApiUrl:
@@ -155,3 +288,12 @@ Outputs:
   CognitoUserPoolClientId:
     Description: Cognito user pool client scaffold identifier
     Value: !Ref DocumentUserPoolClient
+  ReceivedEmailTableName:
+    Description: DynamoDB table for received email metadata
+    Value: !Ref ReceivedEmailTable
+  EmailReceiptRuleSetName:
+    Description: SES Receipt Rule Set name
+    Value: !Ref EmailReceiptRuleSet
+  EmailFilterFunctionName:
+    Description: Lambda function for filtering emails
+    Value: !Ref EmailFilterFunction
