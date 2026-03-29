@@ -62,6 +62,27 @@ Resources:
             Path: /api/v1/document-instructions/{instructionId}
             Method: DELETE
 
+  # ---- Email Processor ----
+  EmailProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub email-processor-${Stage}
+      Handler: com.officialpapers.api.handler.EmailProcessorHandler
+      CodeUri: ../build/distributions/lambda.zip
+      MemorySize: 1024
+      Timeout: 300
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DocumentBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DocumentInstructionTable
+      Events:
+        EmailQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt IncomingEmailQueue.Arn
+            BatchSize: 1
+
   # ---- DynamoDB (Test) ----
   DocumentInstructionTable:
     Type: AWS::DynamoDB::Table
@@ -80,6 +101,69 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub official-doc-generator-${Stage}-${AWS::AccountId}
+
+  DocumentBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DocumentBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action:
+              - s3:PutObject
+            Resource: !Sub ${DocumentBucket.Arn}/emails/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  # ---- SQS for Email Ingestion ----
+  IncomingEmailQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub incoming-emails-${Stage}
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  IncomingEmailQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref IncomingEmailQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action:
+              - sqs:SendMessage
+            Resource: !GetAtt IncomingEmailQueue.Arn
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  # ---- SES Email Receiving ----
+  EmailReceiptRuleSet:
+    Type: AWS::SES::ReceiptRuleSet
+    Properties:
+      RuleSetName: !Sub gongwengpt-ruleset-${Stage}
+
+  EmailReceiptRule:
+    Type: AWS::SES::ReceiptRule
+    Properties:
+      RuleSetName: !Ref EmailReceiptRuleSet
+      Rule:
+        Name: !Sub forward-to-sqs-${Stage}
+        Enabled: true
+        Recipients:
+          - gongwengpt.click
+        Actions:
+          - S3Action:
+              BucketName: !Ref DocumentBucket
+              ObjectKeyPrefix: emails/
+          - SQSAction:
+              QueueArn: !GetAtt IncomingEmailQueue.Arn
 
   # ---- CodePipeline ----
   ArtifactBucket:
@@ -243,3 +327,12 @@ Outputs:
     Value: !Ref DocumentInstructionTable
   BucketName:
     Value: !Ref DocumentBucket
+  IncomingEmailQueueUrl:
+    Description: SQS Queue URL for incoming emails
+    Value: !Ref IncomingEmailQueue
+  IncomingEmailQueueArn:
+    Description: SQS Queue ARN for incoming emails
+    Value: !GetAtt IncomingEmailQueue.Arn
+  EmailRuleSetName:
+    Description: SES Receipt Rule Set Name
+    Value: !Ref EmailReceiptRuleSet
