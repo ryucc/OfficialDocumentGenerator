@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from './config'
 import './DocumentDetail.css'
 
 interface Document {
@@ -11,8 +12,6 @@ interface Document {
   createdAt: string
   updatedAt: string
 }
-
-const API_BASE_URL = 'https://b1qdg79vji.execute-api.ap-northeast-1.amazonaws.com/Prod/api/v1'
 
 function DocumentDetail() {
   const { id } = useParams<{ id: string }>()

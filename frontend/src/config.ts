@@ -1,0 +1,2 @@
+// API Configuration
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://b1qdg79vji.execute-api.ap-northeast-1.amazonaws.com/Prod/api/v1'
