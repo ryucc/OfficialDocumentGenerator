@@ -14,7 +14,6 @@ The pipeline receives emails at `ai@gongwengpt.click`, filters by sender allowli
 
 ## Current Configuration
 
-- **Allowed Sender**: `shortyliu@gmail.com`
 - **Email Address**: `ai@gongwengpt.click`
 - **Domain**: `gongwengpt.click` (managed in Route 53)
 - **Storage**: Shared S3 bucket with main application
@@ -22,97 +21,89 @@ The pipeline receives emails at `ai@gongwengpt.click`, filters by sender allowli
 
 ## Deployment
 
-### 1. Deploy the Stack
+### 1. Get Route 53 Hosted Zone ID (Optional)
+
+If you want CloudFormation to automatically setup DNS:
 
 ```bash
-./scripts/deploy-with-email.sh test
+aws route53 list-hosted-zones --query "HostedZones[?Name=='gongwengpt.click.'].Id" --output text
 ```
 
-This deploys the complete stack including:
-- API Gateway + Lambda functions (existing)
-- Cognito user pool (existing)
-- S3 bucket (existing, shared)
-- Email filter Lambda
-- Email metadata Lambda
-- DynamoDB table for email metadata
-- SES receipt rules
+### 2. Deploy the Stack
 
-### 2. Configure AWS SES
-
-#### Verify Domain
+**With automatic DNS setup** (recommended):
 
 ```bash
-aws ses verify-domain-identity --domain gongwengpt.click --region us-east-1
-```
-
-This returns a verification token. Add it to Route 53:
-
-```bash
-# Get the verification token
-TOKEN=$(aws ses verify-domain-identity --domain gongwengpt.click --region us-east-1 --query 'VerificationToken' --output text)
-
-# Add TXT record to Route 53
-./scripts/setup-ses-dns.sh
-```
-
-#### Configure Route 53 DNS Records
-
-Add MX record to receive emails:
-
-```bash
-# MX record pointing to SES
-# Name: @ (root domain)
-# Type: MX
-# Priority: 10
-# Value: inbound-smtp.us-east-1.amazonaws.com
-```
-
-Or use the helper script:
-
-```bash
-./scripts/setup-ses-dns.sh
-```
-
-#### Activate SES Receipt Rule Set
-
-```bash
-# Get rule set name from stack outputs
-RULE_SET_NAME=$(aws cloudformation describe-stacks \
+sam deploy \
+  --template-file infra/app-only.yaml \
   --stack-name official-doc-generator-app-test \
-  --query 'Stacks[0].Outputs[?OutputKey==`EmailReceiptRuleSetName`].OutputValue' \
-  --output text)
-
-# Activate the rule set
-aws ses set-active-receipt-rule-set --rule-set-name $RULE_SET_NAME --region us-east-1
+  --parameter-overrides \
+    Stage=test \
+    AllowedEmailSenders="shortyliu@gmail.com" \
+    DomainName=gongwengpt.click \
+    Route53HostedZoneId=<YOUR_HOSTED_ZONE_ID> \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+  --resolve-s3
 ```
 
-### 3. (Optional) Move SES Out of Sandbox
-
-By default, SES is in sandbox mode and can only receive from verified email addresses. To receive from any email:
-
-1. Go to AWS SES Console
-2. Click "Account Dashboard"
-3. Click "Request production access"
-4. Fill out the form explaining your use case
-
-## Managing the Allowlist
-
-### View Current Allowlist
+**Without automatic DNS setup** (manual DNS configuration required):
 
 ```bash
-./scripts/update-allowlist.sh
+sam deploy \
+  --template-file infra/app-only.yaml \
+  --stack-name official-doc-generator-app-test \
+  --parameter-overrides \
+    Stage=test \
+    AllowedEmailSenders="shortyliu@gmail.com" \
+    DomainName=gongwengpt.click \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+  --resolve-s3
 ```
 
-### Update Allowlist
+If you don't provide `Route53HostedZoneId`, you'll need to manually add:
+- MX record: `10 inbound-smtp.us-east-1.amazonaws.com`
+- TXT record: `_amazonses.gongwengpt.click` = (get token from stack outputs)
+
+### What Gets Deployed
+
+CloudFormation will automatically:
+- ✅ Deploy Lambda functions (email filter, metadata extractor, SES setup)
+- ✅ Create DynamoDB table for email metadata
+- ✅ Create SES receipt rule set and rules
+- ✅ Verify domain with SES (via custom resource)
+- ✅ Activate SES receipt rule set (via custom resource)
+- ✅ Configure Route 53 DNS records (if hosted zone ID provided)
+
+No manual steps required!
+
+## Configuration
+
+### Update Email Allowlist
+
+To change which senders are allowed:
 
 ```bash
-./scripts/update-allowlist.sh "email1@example.com,email2@example.com,email3@example.com"
+sam deploy \
+  --template-file infra/app-only.yaml \
+  --stack-name official-doc-generator-app-test \
+  --parameter-overrides \
+    Stage=test \
+    AllowedEmailSenders="email1@example.com,email2@example.com,email3@example.com" \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+  --no-fail-on-empty-changeset
 ```
 
 ### Allow All Senders (Remove Filter)
 
 ```bash
-./scripts/update-allowlist.sh ""
+sam deploy \
+  --template-file infra/app-only.yaml \
+  --stack-name official-doc-generator-app-test \
+  --parameter-overrides \
+    Stage=test \
+    AllowedEmailSenders="" \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+  --no-fail-on-empty-changeset
 ```
 
 ## Monitoring Received Emails
@@ -120,47 +111,80 @@ By default, SES is in sandbox mode and can only receive from verified email addr
 ### List Recent Emails
 
 ```bash
-# List last 20 emails
-./scripts/list-received-emails.sh
-
-# List last 50 emails
-./scripts/list-received-emails.sh 50
-```
-
-### Query Email Metadata
-
-```bash
-# Query last 10 emails from DynamoDB
-./scripts/query-email-metadata.sh
-
-# Query last 50 emails
-./scripts/query-email-metadata.sh 50
-```
-
-### Download an Email
-
-```bash
-# Get the S3 key from the list
-S3_KEY="emails/test/abc123def456"
-
-# Download the email
+# Get bucket name
 BUCKET=$(aws cloudformation describe-stacks \
   --stack-name official-doc-generator-app-test \
   --query 'Stacks[0].Outputs[?OutputKey==`UploadedDocumentBucketName`].OutputValue' \
   --output text)
 
-aws s3 cp "s3://${BUCKET}/${S3_KEY}" email.eml
+# List emails
+aws s3 ls "s3://${BUCKET}/emails/" --recursive --human-readable | tail -20
+```
+
+### Query Email Metadata
+
+```bash
+# Get table name
+TABLE_NAME=$(aws cloudformation describe-stacks \
+  --stack-name official-doc-generator-app-test \
+  --query 'Stacks[0].Outputs[?OutputKey==`ReceivedEmailTableName`].OutputValue' \
+  --output text)
+
+# Query recent emails
+aws dynamodb scan \
+  --table-name $TABLE_NAME \
+  --max-items 10 \
+  --query 'Items[*].[receivedAt.S, from.S, subject.S]' \
+  --output table
+```
+
+Or use **AWS Console**:
+- S3: Navigate to bucket → `emails/test/` folder
+- DynamoDB: Navigate to `received-emails-test` table
+
+### Download an Email
+
+```bash
+# Get bucket name
+BUCKET=$(aws cloudformation describe-stacks \
+  --stack-name official-doc-generator-app-test \
+  --query 'Stacks[0].Outputs[?OutputKey==`UploadedDocumentBucketName`].OutputValue' \
+  --output text)
+
+# Download specific email
+aws s3 cp "s3://${BUCKET}/emails/test/<message-id>" email.eml
 
 # View the email
 cat email.eml
 ```
 
+## Lambda Functions
+
+### email-filter/index.py
+Filters incoming emails by checking sender against allowlist. Returns:
+- `CONTINUE` - Allow email processing (save to S3)
+- `STOP_RULE` - Reject email (do not save)
+
+### email-metadata/index.py
+Triggered by S3 when email is saved. Extracts metadata from email and stores in DynamoDB:
+- Message ID
+- From/To addresses
+- Subject
+- Received timestamp
+- S3 location
+
+### ses-setup/index.py
+Custom CloudFormation resource that:
+- Verifies domain with SES and returns verification token
+- Activates SES receipt rule set
+- Handles cleanup on stack deletion
+
 ## Testing
 
 ### Send a Test Email
 
-```bash
-# From shortyliu@gmail.com, send an email to:
+From an allowed sender (e.g., `shortyliu@gmail.com`), send an email to:
+```
 ai@gongwengpt.click
 ```
 
@@ -168,10 +192,18 @@ ai@gongwengpt.click
 
 ```bash
 # Check S3
-./scripts/list-received-emails.sh
+BUCKET=$(aws cloudformation describe-stacks \
+  --stack-name official-doc-generator-app-test \
+  --query 'Stacks[0].Outputs[?OutputKey==`UploadedDocumentBucketName`].OutputValue' \
+  --output text)
+aws s3 ls "s3://${BUCKET}/emails/" --recursive
 
 # Check DynamoDB
-./scripts/query-email-metadata.sh
+TABLE_NAME=$(aws cloudformation describe-stacks \
+  --stack-name official-doc-generator-app-test \
+  --query 'Stacks[0].Outputs[?OutputKey==`ReceivedEmailTableName`].OutputValue' \
+  --output text)
+aws dynamodb scan --table-name $TABLE_NAME
 
 # Check Lambda logs
 aws logs tail /aws/lambda/email-filter-test --follow
@@ -186,16 +218,19 @@ aws logs tail /aws/lambda/email-metadata-test --follow
    ```bash
    aws ses get-identity-verification-attributes --identities gongwengpt.click
    ```
+   Status should be "Success"
 
-2. **Check MX record**
+2. **Check DNS records**
    ```bash
    dig MX gongwengpt.click
+   dig TXT _amazonses.gongwengpt.click
    ```
 
 3. **Check if rule set is active**
    ```bash
    aws ses describe-active-receipt-rule-set
    ```
+   Should show `gongwengpt-email-rules-test`
 
 4. **Check Lambda logs**
    ```bash
@@ -206,25 +241,44 @@ aws logs tail /aws/lambda/email-metadata-test --follow
 
 1. **Check current allowlist**
    ```bash
-   aws lambda get-function-configuration --function-name email-filter-test \
-     --query 'Environment.Variables.ALLOWED_SENDERS'
+   aws cloudformation describe-stacks \
+     --stack-name official-doc-generator-app-test \
+     --query 'Stacks[0].Parameters[?ParameterKey==`AllowedEmailSenders`].ParameterValue' \
+     --output text
    ```
 
-2. **Update allowlist**
-   ```bash
-   ./scripts/update-allowlist.sh "correct@email.com"
-   ```
+2. **Update allowlist** (see Configuration section above)
 
 ### SES Sandbox Mode
 
-If you're in SES sandbox mode, you can only receive from:
-- Verified email addresses
-- Verified domains
+By default, SES is in sandbox mode and can only receive from verified email addresses or domains.
 
 To verify an email address:
 ```bash
 aws ses verify-email-identity --email-address sender@example.com
 ```
+
+To move out of sandbox mode:
+1. Go to AWS SES Console
+2. Click "Account Dashboard"
+3. Click "Request production access"
+
+## Stack Outputs
+
+After deployment, view outputs:
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name official-doc-generator-app-test \
+  --query 'Stacks[0].Outputs' \
+  --output table
+```
+
+Key outputs:
+- `EmailAddress` - The configured email address
+- `UploadedDocumentBucketName` - S3 bucket where emails are stored
+- `ReceivedEmailTableName` - DynamoDB table with email metadata
+- `SESVerificationToken` - Domain verification token (if manual DNS needed)
 
 ## Cost Estimation
 

@@ -11,6 +11,14 @@ Parameters:
     Type: CommaDelimitedList
     Default: ""
     Description: Comma-separated list of allowed sender email addresses for ai@gongwengpt.click (leave empty to allow all)
+  DomainName:
+    Type: String
+    Default: gongwengpt.click
+    Description: Domain name for email receiving
+  Route53HostedZoneId:
+    Type: String
+    Description: Route 53 Hosted Zone ID for the domain (leave empty to skip DNS setup)
+    Default: ""
 
 Globals:
   Function:
@@ -257,7 +265,7 @@ Resources:
         Enabled: true
         ScanEnabled: true
         Recipients:
-          - ai@gongwengpt.click
+          - !Sub ai@${DomainName}
         Actions:
           # First: Filter by Lambda
           - LambdaAction:
@@ -267,6 +275,66 @@ Resources:
           - S3Action:
               BucketName: !Ref UploadedDocumentBucket
               ObjectKeyPrefix: !Sub emails/${Stage}/
+
+  # ---- SES Domain Setup with Custom Resource ----
+
+  # Lambda function for SES setup custom resource
+  SESSetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ses-setup-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/ses-setup
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:VerifyDomainIdentity
+                - ses:SetActiveReceiptRuleSet
+                - ses:DescribeActiveReceiptRuleSet
+              Resource: '*'
+
+  # Custom resource to verify domain and activate rule set
+  SESSetup:
+    Type: Custom::SESSetup
+    DependsOn:
+      - EmailReceiptRule
+    Properties:
+      ServiceToken: !GetAtt SESSetupFunction.Arn
+      Domain: !Ref DomainName
+      RuleSetName: !Ref EmailReceiptRuleSet
+
+  # ---- Route 53 DNS Records (optional) ----
+
+  # MX Record for receiving emails
+  EmailMXRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Ref DomainName
+      Type: MX
+      TTL: 300
+      ResourceRecords:
+        - !Sub 10 inbound-smtp.${AWS::Region}.amazonaws.com
+
+  # TXT Record for SES domain verification
+  EmailVerificationRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    DependsOn: SESSetup
+    Properties:
+      HostedZoneId: !Ref Route53HostedZoneId
+      Name: !Sub _amazonses.${DomainName}
+      Type: TXT
+      TTL: 300
+      ResourceRecords:
+        - !Sub '"${SESSetup.VerificationToken}"'
+
+Conditions:
+  HasHostedZone: !Not [!Equals [!Ref Route53HostedZoneId, ""]]
 
 Outputs:
   ApiUrl:
@@ -297,3 +365,9 @@ Outputs:
   EmailFilterFunctionName:
     Description: Lambda function for filtering emails
     Value: !Ref EmailFilterFunction
+  EmailAddress:
+    Description: Email address for receiving emails
+    Value: !Sub ai@${DomainName}
+  SESVerificationToken:
+    Description: SES domain verification token (already applied if Route53HostedZoneId provided)
+    Value: !GetAtt SESSetup.VerificationToken
