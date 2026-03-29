@@ -189,12 +189,16 @@ Resources:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/auth/logout
             Method: POST
+            Auth:
+              Authorizer: NONE
         GetCurrentUser:
           Type: Api
           Properties:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/auth/me
             Method: GET
+            Auth:
+              Authorizer: NONE
 
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table

@@ -31,6 +31,8 @@ class OpenApiContractTest {
         assertTrue(samTemplate.contains("Path: /api/v1/auth/login"));
         assertTrue(samTemplate.contains("Path: /api/v1/auth/respond-to-new-password"));
         assertTrue(samTemplate.contains("Path: /api/v1/auth/me"));
+        assertTrue(samTemplate.contains("Path: /api/v1/auth/logout\n            Method: POST\n            Auth:\n              Authorizer: NONE"));
+        assertTrue(samTemplate.contains("Path: /api/v1/auth/me\n            Method: GET\n            Auth:\n              Authorizer: NONE"));
         assertTrue(!samTemplate.contains("Path: /api/v1/auth/signup"));
         assertTrue(!samTemplate.contains("Path: /api/v1/auth/confirm-signup"));
         assertTrue(!samTemplate.contains("Path: /api/v1/auth/resend-confirmation"));
@@ -43,6 +45,8 @@ class OpenApiContractTest {
         assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/login"));
         assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/respond-to-new-password"));
         assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/me"));
+        assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/logout\n            Method: POST\n            Auth:\n              Authorizer: NONE"));
+        assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/me\n            Method: GET\n            Auth:\n              Authorizer: NONE"));
         assertTrue(appOnlyTemplate.contains("DefaultAuthorizer: CognitoAuthorizer"));
         assertTrue(appOnlyTemplate.contains("AllowHeaders: \"'Content-Type,Authorization'\""));
         assertTrue(appOnlyTemplate.contains("COGNITO_USER_POOL_CLIENT_ID"));
