@@ -1,17 +1,20 @@
 package com.officialpapers.api.handler;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 import java.util.Map;
 
 public class SesReceiptEvent {
-    private List<Record> Records;
+    @JsonProperty("Records")
+    private List<Record> records;
 
     public List<Record> getRecords() {
-        return Records;
+        return records;
     }
 
-    public void setRecords(List<Record> Records) {
-        this.Records = Records;
+    public void setRecords(List<Record> records) {
+        this.records = records;
     }
 
     public static class Record {
@@ -114,15 +117,15 @@ public class SesReceiptEvent {
     }
 
     public static class CommonHeaders {
-        private String from;
+        private List<String> from;
         private String subject;
         private List<String> to;
 
-        public String getFrom() {
+        public List<String> getFrom() {
             return from;
         }
 
-        public void setFrom(String from) {
+        public void setFrom(List<String> from) {
             this.from = from;
         }
 
