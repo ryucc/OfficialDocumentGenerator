@@ -93,10 +93,7 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
 
     private APIGatewayProxyResponseEvent deleteInstruction(Map<String, String> pathParams) {
         instructionService.deleteInstruction(requireInstructionId(pathParams));
-        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
-        response.setStatusCode(204);
-        response.setHeaders(Map.of("Content-Type", "application/json"));
-        return response;
+        return apiMapper.toNoContentResponse();
     }
 
     private String requireInstructionId(Map<String, String> pathParams) {

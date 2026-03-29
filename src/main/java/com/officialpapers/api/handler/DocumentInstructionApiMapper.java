@@ -1,5 +1,6 @@
 package com.officialpapers.api.handler;
 
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.officialpapers.api.generated.model.ApiError;
 import com.officialpapers.api.generated.model.DocumentInstruction;
 import com.officialpapers.api.generated.model.DocumentInstructionCreateRequest;
@@ -13,6 +14,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Singleton
@@ -51,5 +53,12 @@ public class DocumentInstructionApiMapper {
         return new ApiError()
                 .code(code)
                 .message(message);
+    }
+
+    public APIGatewayProxyResponseEvent toNoContentResponse() {
+        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+        response.setStatusCode(204);
+        response.setHeaders(Map.of("Content-Type", "application/json"));
+        return response;
     }
 }
