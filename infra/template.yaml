@@ -142,7 +142,30 @@ Resources:
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
 
-  # ---- SQS for Email Ingestion ----
+  # ---- SNS Topic for Email Notifications ----
+  IncomingEmailTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub incoming-emails-${Stage}
+
+  IncomingEmailTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref IncomingEmailTopic
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref IncomingEmailTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  # ---- SQS Queue subscribed to SNS ----
   IncomingEmailQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -159,13 +182,21 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ses.amazonaws.com
+              Service: sns.amazonaws.com
             Action:
               - sqs:SendMessage
             Resource: !GetAtt IncomingEmailQueue.Arn
             Condition:
               StringEquals:
-                aws:SourceAccount: !Ref AWS::AccountId
+                aws:SourceArn: !Ref IncomingEmailTopic
+
+  IncomingEmailQueueSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref IncomingEmailTopic
+      Endpoint: !GetAtt IncomingEmailQueue.Arn
+      RawMessageDelivery: false
 
   # ---- SES Email Receiving ----
   EmailReceiptRuleSet:
@@ -178,7 +209,7 @@ Resources:
     Properties:
       RuleSetName: !Ref EmailReceiptRuleSet
       Rule:
-        Name: !Sub forward-to-sqs-${Stage}
+        Name: !Sub forward-to-sns-${Stage}
         Enabled: true
         Recipients:
           - gongwengpt.click
@@ -189,8 +220,9 @@ Resources:
           - S3Action:
               BucketName: !Ref DocumentBucket
               ObjectKeyPrefix: emails/
-          - SQSAction:
-              QueueArn: !GetAtt IncomingEmailQueue.Arn
+          - SNSAction:
+              TopicArn: !Ref IncomingEmailTopic
+              Encoding: UTF-8
 
   # ---- CodePipeline ----
   ArtifactBucket:
@@ -354,6 +386,9 @@ Outputs:
     Value: !Ref DocumentInstructionTable
   BucketName:
     Value: !Ref DocumentBucket
+  IncomingEmailTopicArn:
+    Description: SNS Topic ARN for incoming emails
+    Value: !Ref IncomingEmailTopic
   IncomingEmailQueueUrl:
     Description: SQS Queue URL for incoming emails
     Value: !Ref IncomingEmailQueue

@@ -13,17 +13,21 @@ Email sent to gongwengpt.click
          ↓
     AWS SES receives
          ↓
+  Filter Lambda (allowlist check)
+         ↓
     ┌─────────────┬─────────────┐
     ↓             ↓             ↓
 Raw email     Metadata      Receipt
-to S3         to SQS        actions
+to S3         to SNS        actions
     ↓             ↓
-S3 Bucket   SQS Queue
-(MIME msg)   (pointer)
-         ↓
-    Lambda triggers
-         ↓
-   Parse email flow
+S3 Bucket   SNS Topic
+(MIME msg)       ↓
+            SQS Queue
+            (subscribed)
+                 ↓
+        Processor Lambda
+                 ↓
+           Parse email flow
 ```
 
 ### 1. **Email Storage in S3**
@@ -33,27 +37,16 @@ When SES receives an email:
 - Path: `s3://bucket/emails/<messageId>`
 - Contains: headers, body, **all attachments embedded**
 
-### 2. **SQS Notification**
+### 2. **SNS → SQS Notification**
 
-SQS message contains:
+SES publishes to SNS topic, which forwards to SQS. The SQS message contains:
 ```json
 {
-  "Message": {
-    "mail": {
-      "messageId": "...",
-      "source": "sender@example.com",
-      "destination": ["recipient@gongwengpt.click"]
-    },
-    "receipt": {
-      "action": {
-        "type": "S3",
-        "bucketName": "official-doc-generator-test-...",
-        "objectKey": "emails/abc123..."
-      }
-    }
-  }
+  "Message": "{\"mail\":{\"messageId\":\"...\",\"source\":\"sender@example.com\"},\"receipt\":{\"action\":{\"type\":\"S3\",\"bucketName\":\"official-doc-generator-test-...\",\"objectKey\":\"emails/abc123...\"}}}"
 }
 ```
+
+Note: SES Receipt Rules support S3Action, SNSAction, and LambdaAction, but **not** direct SQSAction. We use SNS → SQS subscription pattern.
 
 ### 3. **Lambda Processing**
 
