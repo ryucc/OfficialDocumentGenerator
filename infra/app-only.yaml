@@ -404,6 +404,7 @@ Resources:
       Environment:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
+          DOCUMENT_GENERATOR_FUNCTION_NAME: !Ref DocumentGeneratorFunction
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
@@ -412,6 +413,16 @@ Resources:
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailProcessingQueue.QueueName
         - Statement:
+            - Sid: S3WriteAttachments
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/email-attachments/*
+            - Sid: InvokeDocumentGenerator
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt DocumentGeneratorFunction.Arn
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
@@ -425,6 +436,45 @@ Resources:
           Properties:
             Queue: !GetAtt EmailProcessingQueue.Arn
             BatchSize: 10
+
+  # Lambda function to generate official documents from email projects
+  DocumentGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub document-generator-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/document-generator
+      Timeout: 300
+      MemorySize: 1024
+      Environment:
+        Variables:
+          PROJECTS_TABLE: !Ref ProjectsTable
+          UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
+          ANTHROPIC_API_KEY: '{{resolve:secretsmanager:anthropic-api-key:SecretString:ANTHROPIC_API_KEY}}'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProjectsTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+        - Statement:
+            - Sid: S3WriteGeneratedDocuments
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/generated-documents/*
+            - Sid: TextractAccess
+              Effect: Allow
+              Action:
+                - textract:DetectDocumentText
+              Resource: '*'
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/document-generator-${Stage}:*
 
   # Lambda function for Projects API
   ProjectsApiFunction:
