@@ -1,7 +1,9 @@
 package com.officialpapers.api.service;
 
+import com.officialpapers.domain.AuthChallenge;
 import com.officialpapers.domain.AuthTokens;
 import com.officialpapers.domain.AuthenticatedUser;
+import com.officialpapers.domain.LoginResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ChallengeNameType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ForgotPasswordRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
@@ -18,12 +21,12 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.GlobalSignO
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.NotAuthorizedException;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ResendConfirmationCodeRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.RespondToAuthChallengeRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.RespondToAuthChallengeResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.RevokeTokenRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.UsernameExistsException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -57,14 +60,35 @@ class CognitoAuthServiceTest {
                         .build()
         );
 
-        AuthTokens tokens = service.login("user@example.com", "secret-password");
+        LoginResult result = service.login("user@example.com", "secret-password");
 
-        assertEquals("access-token", tokens.accessToken());
+        assertNotNull(result.tokens());
+        assertEquals("access-token", result.tokens().accessToken());
+        assertEquals(null, result.challenge());
 
         ArgumentCaptor<InitiateAuthRequest> captor = ArgumentCaptor.forClass(InitiateAuthRequest.class);
         verify(cognitoClient).initiateAuth(captor.capture());
         assertEquals("client-123", captor.getValue().clientId());
         assertEquals("user@example.com", captor.getValue().authParameters().get("USERNAME"));
+    }
+
+    @Test
+    void loginReturnsNewPasswordChallenge() {
+        when(cognitoClient.initiateAuth(any(InitiateAuthRequest.class))).thenReturn(
+                InitiateAuthResponse.builder()
+                        .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
+                        .session("challenge-session")
+                        .build()
+        );
+
+        LoginResult result = service.login("User@example.com", "temp-password");
+
+        assertEquals(null, result.tokens());
+        AuthChallenge challenge = result.challenge();
+        assertNotNull(challenge);
+        assertEquals("NEW_PASSWORD_REQUIRED", challenge.challengeName());
+        assertEquals("challenge-session", challenge.session());
+        assertEquals("user@example.com", challenge.email());
     }
 
     @Test
@@ -79,31 +103,6 @@ class CognitoAuthServiceTest {
         );
 
         assertEquals("INVALID_CREDENTIALS", exception.code());
-    }
-
-    @Test
-    void signUpMapsExistingUserToConflict() {
-        when(cognitoClient.signUp(any(SignUpRequest.class))).thenThrow(
-                UsernameExistsException.builder().message("exists").build()
-        );
-
-        ConflictException exception = assertThrows(
-                ConflictException.class,
-                () -> service.signUp("user@example.com", "secret-password")
-        );
-
-        assertEquals("USER_ALREADY_EXISTS", exception.code());
-    }
-
-    @Test
-    void resendConfirmationSuppressesMissingUser() {
-        when(cognitoClient.resendConfirmationCode(any(ResendConfirmationCodeRequest.class))).thenThrow(
-                NotAuthorizedException.builder().message("not found").build()
-        );
-
-        service.resendConfirmation("missing@example.com");
-
-        verify(cognitoClient).resendConfirmationCode(any(ResendConfirmationCodeRequest.class));
     }
 
     @Test
@@ -124,37 +123,6 @@ class CognitoAuthServiceTest {
         assertEquals("user-123", user.userId());
         assertEquals("user@example.com", user.email());
         assertEquals(true, user.emailVerified());
-    }
-
-    @Test
-    void signUpNormalizesEmailToLowercase() {
-        service.signUp("User@EXAMPLE.COM", "password");
-
-        ArgumentCaptor<SignUpRequest> captor = ArgumentCaptor.forClass(SignUpRequest.class);
-        verify(cognitoClient).signUp(captor.capture());
-        assertEquals("user@example.com", captor.getValue().username());
-    }
-
-    @Test
-    void signUpThrowsBadRequestWhenEmailIsBlank() {
-        BadRequestException exception = assertThrows(
-                BadRequestException.class,
-                () -> service.signUp("", "password")
-        );
-
-        assertEquals("email is required", exception.getMessage());
-        verifyNoInteractions(cognitoClient);
-    }
-
-    @Test
-    void signUpThrowsBadRequestWhenPasswordIsBlank() {
-        BadRequestException exception = assertThrows(
-                BadRequestException.class,
-                () -> service.signUp("user@example.com", "")
-        );
-
-        assertEquals("password is required", exception.getMessage());
-        verifyNoInteractions(cognitoClient);
     }
 
     @Test
@@ -187,6 +155,43 @@ class CognitoAuthServiceTest {
     }
 
     @Test
+    void respondToNewPasswordReturnsTokens() {
+        when(cognitoClient.respondToAuthChallenge(any(RespondToAuthChallengeRequest.class))).thenReturn(
+                RespondToAuthChallengeResponse.builder()
+                        .authenticationResult(AuthenticationResultType.builder()
+                                .accessToken("access-token")
+                                .idToken("id-token")
+                                .refreshToken("refresh-token")
+                                .tokenType("Bearer")
+                                .expiresIn(3600)
+                                .build())
+                        .build()
+        );
+
+        AuthTokens tokens = service.respondToNewPassword("User@example.com", "new-password", "challenge-session");
+
+        assertEquals("access-token", tokens.accessToken());
+
+        ArgumentCaptor<RespondToAuthChallengeRequest> captor = ArgumentCaptor.forClass(RespondToAuthChallengeRequest.class);
+        verify(cognitoClient).respondToAuthChallenge(captor.capture());
+        assertEquals(ChallengeNameType.NEW_PASSWORD_REQUIRED, captor.getValue().challengeName());
+        assertEquals("challenge-session", captor.getValue().session());
+        assertEquals("user@example.com", captor.getValue().challengeResponses().get("USERNAME"));
+        assertEquals("new-password", captor.getValue().challengeResponses().get("NEW_PASSWORD"));
+    }
+
+    @Test
+    void respondToNewPasswordThrowsBadRequestWhenSessionIsBlank() {
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> service.respondToNewPassword("user@example.com", "new-password", " ")
+        );
+
+        assertEquals("session is required", exception.getMessage());
+        verifyNoInteractions(cognitoClient);
+    }
+
+    @Test
     void refreshThrowsBadRequestWhenTokenIsBlank() {
         BadRequestException exception = assertThrows(
                 BadRequestException.class,
@@ -194,16 +199,6 @@ class CognitoAuthServiceTest {
         );
 
         assertEquals("refreshToken is required", exception.getMessage());
-    }
-
-    @Test
-    void confirmSignUpThrowsBadRequestWhenCodeIsBlank() {
-        BadRequestException exception = assertThrows(
-                BadRequestException.class,
-                () -> service.confirmSignUp("user@example.com", "")
-        );
-
-        assertEquals("confirmationCode is required", exception.getMessage());
     }
 
     @Test
@@ -282,17 +277,4 @@ class CognitoAuthServiceTest {
         assertEquals("TOO_MANY_REQUESTS", exception.code());
     }
 
-    @Test
-    void signUpMapsInternalErrorToServiceUnavailable() {
-        when(cognitoClient.signUp(any(SignUpRequest.class))).thenThrow(
-                software.amazon.awssdk.services.cognitoidentityprovider.model.InternalErrorException.builder().build()
-        );
-
-        ServiceUnavailableException exception = assertThrows(
-                ServiceUnavailableException.class,
-                () -> service.signUp("user@example.com", "password")
-        );
-
-        assertEquals("COGNITO_UNAVAILABLE", exception.code());
-    }
 }

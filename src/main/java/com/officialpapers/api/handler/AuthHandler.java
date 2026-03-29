@@ -15,7 +15,6 @@ import com.officialpapers.api.generated.model.ApiError;
 import com.officialpapers.api.service.ApiException;
 import com.officialpapers.api.service.AuthService;
 import com.officialpapers.api.service.BadRequestException;
-import com.officialpapers.domain.AuthTokens;
 import com.officialpapers.domain.AuthenticatedUser;
 
 import javax.inject.Inject;
@@ -88,21 +87,6 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
     }
 
     private APIGatewayProxyResponseEvent handlePost(String path, APIGatewayProxyRequestEvent event) {
-        if (path.endsWith("/auth/signup")) {
-            CredentialsRequest request = credentialsRequest(event);
-            authService.signUp(request.email(), request.password());
-            return apiMapper.toNoContentResponse();
-        }
-        if (path.endsWith("/auth/confirm-signup")) {
-            CodeRequest request = codeRequest(event);
-            authService.confirmSignUp(request.email(), request.confirmationCode());
-            return apiMapper.toNoContentResponse();
-        }
-        if (path.endsWith("/auth/resend-confirmation")) {
-            EmailOnlyRequest request = emailOnlyRequest(event);
-            authService.resendConfirmation(request.email());
-            return apiMapper.toNoContentResponse();
-        }
         if (path.endsWith("/auth/login")) {
             CredentialsRequest request = credentialsRequest(event);
             return jsonResponse(200, authService.login(request.email(), request.password()));
@@ -110,6 +94,14 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
         if (path.endsWith("/auth/refresh")) {
             RefreshRequest request = refreshRequest(event);
             return jsonResponse(200, authService.refresh(request.refreshToken()));
+        }
+        if (path.endsWith("/auth/respond-to-new-password")) {
+            NewPasswordChallengeRequest request = newPasswordChallengeRequest(event);
+            return jsonResponse(200, authService.respondToNewPassword(
+                    request.email(),
+                    request.newPassword(),
+                    request.session()
+            ));
         }
         if (path.endsWith("/auth/forgot-password")) {
             EmailOnlyRequest request = emailOnlyRequest(event);
@@ -137,14 +129,6 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
         );
     }
 
-    private CodeRequest codeRequest(APIGatewayProxyRequestEvent event) {
-        JsonNode body = readJsonObject(event, Set.of("email", "confirmationCode"));
-        return new CodeRequest(
-                requiredText(body, "email"),
-                requiredText(body, "confirmationCode")
-        );
-    }
-
     private EmailOnlyRequest emailOnlyRequest(APIGatewayProxyRequestEvent event) {
         JsonNode body = readJsonObject(event, Set.of("email"));
         return new EmailOnlyRequest(requiredText(body, "email"));
@@ -161,6 +145,15 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
                 requiredText(body, "email"),
                 requiredText(body, "confirmationCode"),
                 requiredText(body, "newPassword")
+        );
+    }
+
+    private NewPasswordChallengeRequest newPasswordChallengeRequest(APIGatewayProxyRequestEvent event) {
+        JsonNode body = readJsonObject(event, Set.of("email", "newPassword", "session"));
+        return new NewPasswordChallengeRequest(
+                requiredText(body, "email"),
+                requiredText(body, "newPassword"),
+                requiredText(body, "session")
         );
     }
 
@@ -243,9 +236,6 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
     private record CredentialsRequest(String email, String password) {
     }
 
-    private record CodeRequest(String email, String confirmationCode) {
-    }
-
     private record EmailOnlyRequest(String email) {
     }
 
@@ -253,6 +243,9 @@ public class AuthHandler implements RequestHandler<APIGatewayProxyRequestEvent, 
     }
 
     private record ResetPasswordRequest(String email, String confirmationCode, String newPassword) {
+    }
+
+    private record NewPasswordChallengeRequest(String email, String newPassword, String session) {
     }
 
     private record CurrentUserResponse(String userId, String email, boolean emailVerified) {

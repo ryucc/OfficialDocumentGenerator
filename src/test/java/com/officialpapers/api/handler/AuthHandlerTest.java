@@ -5,8 +5,10 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.officialpapers.api.service.AuthService;
+import com.officialpapers.domain.AuthChallenge;
 import com.officialpapers.domain.AuthTokens;
 import com.officialpapers.domain.AuthenticatedUser;
+import com.officialpapers.domain.LoginResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,7 +40,7 @@ class AuthHandlerTest {
     @Test
     void loginReturnsTokenPayload() throws Exception {
         when(authService.login("user@example.com", "secret-password")).thenReturn(
-                new AuthTokens("access-token", "id-token", "refresh-token", "Bearer", 3600)
+                LoginResult.authenticated(new AuthTokens("access-token", "id-token", "refresh-token", "Bearer", 3600))
         );
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(
@@ -48,14 +50,31 @@ class AuthHandlerTest {
 
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals(200, response.getStatusCode());
-        assertEquals("access-token", body.get("accessToken").asText());
-        assertEquals("Bearer", body.get("tokenType").asText());
+        assertEquals("access-token", body.get("tokens").get("accessToken").asText());
+        assertEquals("Bearer", body.get("tokens").get("tokenType").asText());
     }
 
     @Test
-    void signupRejectsUnknownField() throws Exception {
+    void loginReturnsChallengePayload() throws Exception {
+        when(authService.login("user@example.com", "temp-password")).thenReturn(
+                LoginResult.challenged(new AuthChallenge("NEW_PASSWORD_REQUIRED", "session-123", "user@example.com"))
+        );
+
         APIGatewayProxyResponseEvent response = handler.handleRequest(
-                request("POST", "/api/v1/auth/signup", "{\"email\":\"user@example.com\",\"password\":\"secret-password\",\"extra\":true}", null),
+                request("POST", "/api/v1/auth/login", "{\"email\":\"user@example.com\",\"password\":\"temp-password\"}", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(200, response.getStatusCode());
+        assertEquals("NEW_PASSWORD_REQUIRED", body.get("challenge").get("challengeName").asText());
+        assertEquals("session-123", body.get("challenge").get("session").asText());
+    }
+
+    @Test
+    void loginRejectsUnknownField() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/login", "{\"email\":\"user@example.com\",\"password\":\"secret-password\",\"extra\":true}", null),
                 null
         );
 
@@ -110,39 +129,6 @@ class AuthHandlerTest {
     }
 
     @Test
-    void signupCallsAuthService() {
-        APIGatewayProxyResponseEvent response = handler.handleRequest(
-                request("POST", "/api/v1/auth/signup", "{\"email\":\"user@example.com\",\"password\":\"secret-password\"}", null),
-                null
-        );
-
-        verify(authService).signUp("user@example.com", "secret-password");
-        assertEquals(204, response.getStatusCode());
-    }
-
-    @Test
-    void confirmSignupCallsAuthService() {
-        APIGatewayProxyResponseEvent response = handler.handleRequest(
-                request("POST", "/api/v1/auth/confirm-signup", "{\"email\":\"user@example.com\",\"confirmationCode\":\"123456\"}", null),
-                null
-        );
-
-        verify(authService).confirmSignUp("user@example.com", "123456");
-        assertEquals(204, response.getStatusCode());
-    }
-
-    @Test
-    void resendConfirmationCallsAuthService() {
-        APIGatewayProxyResponseEvent response = handler.handleRequest(
-                request("POST", "/api/v1/auth/resend-confirmation", "{\"email\":\"user@example.com\"}", null),
-                null
-        );
-
-        verify(authService).resendConfirmation("user@example.com");
-        assertEquals(204, response.getStatusCode());
-    }
-
-    @Test
     void refreshCallsAuthService() throws Exception {
         when(authService.refresh("refresh-token")).thenReturn(
                 new AuthTokens("new-access", "new-id", "refresh-token", "Bearer", 3600)
@@ -156,6 +142,28 @@ class AuthHandlerTest {
         JsonNode body = objectMapper.readTree(response.getBody());
         assertEquals(200, response.getStatusCode());
         assertEquals("new-access", body.get("accessToken").asText());
+    }
+
+    @Test
+    void respondToNewPasswordCallsAuthService() throws Exception {
+        when(authService.respondToNewPassword("user@example.com", "new-secret", "session-123")).thenReturn(
+                new AuthTokens("access-token", "id-token", "refresh-token", "Bearer", 3600)
+        );
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request(
+                        "POST",
+                        "/api/v1/auth/respond-to-new-password",
+                        "{\"email\":\"user@example.com\",\"newPassword\":\"new-secret\",\"session\":\"session-123\"}",
+                        null
+                ),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        verify(authService).respondToNewPassword("user@example.com", "new-secret", "session-123");
+        assertEquals(200, response.getStatusCode());
+        assertEquals("access-token", body.get("accessToken").asText());
     }
 
     @Test

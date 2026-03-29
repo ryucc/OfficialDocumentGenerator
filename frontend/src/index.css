@@ -58,6 +58,8 @@ body {
 /* Navigation */
 .top-nav {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 2rem;
   background: var(--bg-sidebar);
@@ -86,9 +88,72 @@ body {
   color: white;
 }
 
+.nav-spacer {
+  flex: 1;
+}
+
+.nav-user {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.nav-action {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-btn);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.route-loading {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.route-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: route-spin 1s linear infinite;
+}
+
+@keyframes route-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Make app content fill remaining space */
 .app,
 .documents-container {
   flex: 1;
   overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .top-nav {
+    padding: 1rem;
+  }
+
+  .nav-spacer {
+    display: none;
+  }
+
+  .nav-user {
+    width: 100%;
+    order: 5;
+  }
 }

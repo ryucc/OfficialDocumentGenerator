@@ -20,84 +20,10 @@ tags:
   - name: Sample Documents
 
 paths:
-  /auth/signup:
-    post:
-      tags: [Authentication]
-      summary: Create a user account
-      operationId: signUp
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SignUpRequest'
-      responses:
-        '204':
-          description: Account created successfully
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /auth/confirm-signup:
-    post:
-      tags: [Authentication]
-      summary: Confirm a newly created user account
-      operationId: confirmSignUp
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConfirmSignUpRequest'
-      responses:
-        '204':
-          description: Signup confirmed successfully
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
-  /auth/resend-confirmation:
-    post:
-      tags: [Authentication]
-      summary: Resend the signup confirmation code
-      operationId: resendConfirmation
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EmailRequest'
-      responses:
-        '204':
-          description: Confirmation email accepted for delivery
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-
   /auth/login:
     post:
       tags: [Authentication]
-      summary: Exchange email and password for Cognito tokens
+      summary: Exchange email and password for Cognito tokens or a first-login challenge
       operationId: login
       security: []
       requestBody:
@@ -109,6 +35,34 @@ paths:
       responses:
         '200':
           description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/respond-to-new-password:
+    post:
+      tags: [Authentication]
+      summary: Complete a Cognito NEW_PASSWORD_REQUIRED login challenge
+      operationId: respondToNewPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RespondToNewPasswordRequest'
+      responses:
+        '200':
+          description: Challenge completed successfully
           content:
             application/json:
               schema:
@@ -553,32 +507,6 @@ components:
           type: string
           format: date-time
 
-    SignUpRequest:
-      type: object
-      required:
-        - email
-        - password
-      additionalProperties: false
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-
-    ConfirmSignUpRequest:
-      type: object
-      required:
-        - email
-        - confirmationCode
-      additionalProperties: false
-      properties:
-        email:
-          type: string
-          format: email
-        confirmationCode:
-          type: string
-
     EmailRequest:
       type: object
       required:
@@ -609,6 +537,22 @@ components:
       additionalProperties: false
       properties:
         refreshToken:
+          type: string
+
+    RespondToNewPasswordRequest:
+      type: object
+      required:
+        - email
+        - newPassword
+        - session
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        newPassword:
+          type: string
+        session:
           type: string
 
     ConfirmForgotPasswordRequest:
@@ -647,6 +591,32 @@ components:
         expiresIn:
           type: integer
           format: int32
+
+    AuthChallenge:
+      type: object
+      required:
+        - challengeName
+        - session
+        - email
+      properties:
+        challengeName:
+          type: string
+          enum:
+            - NEW_PASSWORD_REQUIRED
+        session:
+          type: string
+        email:
+          type: string
+          format: email
+
+    LoginResult:
+      type: object
+      additionalProperties: false
+      properties:
+        tokens:
+          $ref: '#/components/schemas/AuthTokens'
+        challenge:
+          $ref: '#/components/schemas/AuthChallenge'
 
     CurrentUser:
       type: object

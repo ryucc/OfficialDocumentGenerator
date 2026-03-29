@@ -83,7 +83,10 @@ aws amplify list-jobs \
 ```
 
 ### Wrong API URL?
-Frontend currently hardcodes the API URL. To make it configurable, add environment variable in the CloudFormation template.
+This frontend reads the backend base URL from `VITE_API_BASE_URL`.
+
+- Local development: set it in `frontend/.env` or copy `frontend/.env.example`
+- Amplify: set it in the app environment variables or keep `infra/amplify-frontend.yaml` in sync with the deployed API domain
 
 ## Cost Estimate
 

@@ -18,6 +18,17 @@
   margin: 0;
 }
 
+.documents-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.documents-heading p {
+  color: var(--text-secondary, #999);
+  font-size: 0.95rem;
+}
+
 .upload-btn {
   display: flex;
   align-items: center;
@@ -147,6 +158,14 @@
   color: var(--text-primary, #fff);
   font-weight: 500;
   font-size: 0.95rem;
+}
+
+.filename-link {
+  text-decoration: none;
+}
+
+.filename-link:hover .filename {
+  color: var(--primary-color, #646cff);
 }
 
 .status-badge {

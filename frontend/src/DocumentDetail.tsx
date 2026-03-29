@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { API_BASE_URL } from './config'
+import { createApiError, useAuth } from './auth'
 import './DocumentDetail.css'
 
 interface Document {
@@ -16,6 +16,7 @@ interface Document {
 function DocumentDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { authFetch } = useAuth()
   const [document, setDocument] = useState<Document | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,15 +25,19 @@ function DocumentDetail() {
 
   useEffect(() => {
     if (id) {
-      fetchDocument(id)
+      void fetchDocument(id)
     }
   }, [id])
 
   useEffect(() => {
     if (document && isPdfDocument(document)) {
-      loadPdfPreview()
+      void loadPdfPreview()
     }
   }, [document])
+
+  const resolveErrorMessage = (value: unknown, fallback: string) => (
+    value instanceof Error ? value.message : fallback
+  )
 
   const isPdfDocument = (doc: Document) => {
     return doc.contentType === 'application/pdf' || doc.filename.toLowerCase().endsWith('.pdf')
@@ -43,17 +48,17 @@ function DocumentDetail() {
 
     try {
       setIsLoadingPdf(true)
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${document.id}/download-url`)
+      const response = await authFetch(`/sample-documents/${document.id}/download-url`)
 
       if (!response.ok) {
-        throw new Error('無法取得 PDF 連結')
+        throw await createApiError(response, '無法取得 PDF 連結')
       }
 
       const data = await response.json()
       setPdfUrl(data.downloadUrl)
     } catch (err) {
       console.error('PDF preview error:', err)
-      setError('PDF 預覽載入失敗')
+      setError(resolveErrorMessage(err, 'PDF 預覽載入失敗'))
     } finally {
       setIsLoadingPdf(false)
     }
@@ -63,16 +68,16 @@ function DocumentDetail() {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${docId}`)
+      const response = await authFetch(`/sample-documents/${docId}`)
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        throw await createApiError(response, '載入文件失敗')
       }
 
       const data = await response.json()
       setDocument(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '載入文件時發生錯誤')
+      setError(resolveErrorMessage(err, '載入文件時發生錯誤'))
       console.error('Error fetching document:', err)
     } finally {
       setIsLoading(false)
@@ -83,9 +88,9 @@ function DocumentDetail() {
     if (!document) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${document.id}/download-url`)
+      const response = await authFetch(`/sample-documents/${document.id}/download-url`)
       if (!response.ok) {
-        throw new Error('無法取得下載連結')
+        throw await createApiError(response, '無法取得下載連結')
       }
 
       const data = await response.json()
@@ -97,7 +102,31 @@ function DocumentDetail() {
       window.document.body.removeChild(link)
     } catch (err) {
       console.error('Download error:', err)
-      alert('下載失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '下載失敗，請稍後再試'))
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!document) {
+      return
+    }
+
+    if (!confirm(`確定要刪除「${document.filename}」嗎？此操作無法復原。`)) {
+      return
+    }
+
+    try {
+      const response = await authFetch(`/sample-documents/${document.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw await createApiError(response, '刪除失敗')
+      }
+
+      navigate('/documents')
+    } catch (deletionError) {
+      alert(resolveErrorMessage(deletionError, '刪除失敗，請稍後再試'))
     }
   }
 
@@ -178,7 +207,7 @@ function DocumentDetail() {
 
         <div className="detail-actions">
           <button className="btn-primary" onClick={handleDownload}>下載文件</button>
-          <button className="btn-danger">刪除</button>
+          <button className="btn-danger" onClick={handleDelete}>刪除</button>
         </div>
       </div>
     </div>

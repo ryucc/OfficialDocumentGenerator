@@ -145,6 +145,30 @@
   margin-bottom: 32px;
 }
 
+.auth-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-input);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+}
+
+.auth-banner-link {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-banner-link:hover {
+  color: var(--accent-green);
+}
+
 .suggestions {
   display: flex;
   gap: 12px;
@@ -336,6 +360,10 @@
 
   .suggestions {
     flex-direction: column;
+  }
+
+  .auth-banner {
+    border-radius: 20px;
   }
 }
 

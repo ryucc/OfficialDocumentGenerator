@@ -2,18 +2,15 @@ package com.officialpapers.api.service;
 
 import com.officialpapers.domain.AuthTokens;
 import com.officialpapers.domain.AuthenticatedUser;
+import com.officialpapers.domain.LoginResult;
 
 public interface AuthService {
 
-    void signUp(String email, String password);
-
-    void confirmSignUp(String email, String confirmationCode);
-
-    void resendConfirmation(String email);
-
-    AuthTokens login(String email, String password);
+    LoginResult login(String email, String password);
 
     AuthTokens refresh(String refreshToken);
+
+    AuthTokens respondToNewPassword(String email, String newPassword, String session);
 
     void forgotPassword(String email);
 

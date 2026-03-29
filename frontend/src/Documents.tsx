@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { API_BASE_URL } from './config'
+import { Link } from 'react-router-dom'
+import { createApiError, useAuth } from './auth'
 import './Documents.css'
 
 interface Document {
@@ -13,6 +14,7 @@ interface Document {
 }
 
 function Documents() {
+  const { authFetch, user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,23 +22,27 @@ function Documents() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchDocuments()
+    void fetchDocuments()
   }, [])
+
+  const resolveErrorMessage = (value: unknown, fallback: string) => (
+    value instanceof Error ? value.message : fallback
+  )
 
   const fetchDocuments = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await fetch(`${API_BASE_URL}/sample-documents`)
+      const response = await authFetch('/sample-documents')
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        throw await createApiError(response, '載入文件失敗')
       }
 
       const data = await response.json()
       setDocuments(data.items || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : '載入文件時發生錯誤')
+      setError(resolveErrorMessage(err, '載入文件時發生錯誤'))
       console.error('Error fetching documents:', err)
     } finally {
       setIsLoading(false)
@@ -80,9 +86,9 @@ function Documents() {
 
   const handleDownload = async (doc: Document) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/download-url`)
+      const response = await authFetch(`/sample-documents/${doc.id}/download-url`)
       if (!response.ok) {
-        throw new Error('無法取得下載連結')
+        throw await createApiError(response, '無法取得下載連結')
       }
 
       const data = await response.json()
@@ -94,7 +100,7 @@ function Documents() {
       window.document.body.removeChild(link)
     } catch (err) {
       console.error('Download error:', err)
-      alert('下載失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '下載失敗，請稍後再試'))
     }
   }
 
@@ -104,12 +110,12 @@ function Documents() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}`, {
+      const response = await authFetch(`/sample-documents/${doc.id}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('刪除失敗')
+        throw await createApiError(response, '刪除失敗')
       }
 
       // Refresh document list
@@ -117,7 +123,7 @@ function Documents() {
       alert('刪除成功')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('刪除失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '刪除失敗，請稍後再試'))
     }
   }
 
@@ -150,7 +156,7 @@ function Documents() {
       }
 
       // Step 1: Get presigned upload URL
-      const initResponse = await fetch(`${API_BASE_URL}/sample-documents`, {
+      const initResponse = await authFetch('/sample-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +169,7 @@ function Documents() {
       })
 
       if (!initResponse.ok) {
-        throw new Error('無法初始化上傳')
+        throw await createApiError(initResponse, '無法初始化上傳')
       }
 
       const { document: doc, upload } = await initResponse.json()
@@ -180,12 +186,12 @@ function Documents() {
       }
 
       // Step 3: Mark as complete
-      const completeResponse = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/complete`, {
+      const completeResponse = await authFetch(`/sample-documents/${doc.id}/complete`, {
         method: 'POST',
       })
 
       if (!completeResponse.ok) {
-        throw new Error('檔案已上傳，但無法完成整理，請重新整理後再試')
+        throw await createApiError(completeResponse, '檔案已上傳，但無法完成整理，請重新整理後再試')
       }
 
       // Refresh document list
@@ -194,7 +200,7 @@ function Documents() {
       alert('上傳成功！')
     } catch (err) {
       console.error('Upload error:', err)
-      alert(err instanceof Error ? err.message : '上傳失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '上傳失敗，請稍後再試'))
     } finally {
       setIsUploading(false)
       // Reset file input
@@ -230,7 +236,14 @@ function Documents() {
   return (
     <div className="documents-container">
       <div className="documents-header">
-        <h1>範例管理</h1>
+        <div className="documents-heading">
+          <h1>範例管理</h1>
+          <p>
+            目前登入:
+            {' '}
+            <strong>{user?.email || user?.userId}</strong>
+          </p>
+        </div>
         <button
           onClick={handleUploadClick}
           className="upload-btn"
@@ -270,7 +283,9 @@ function Documents() {
               <tr key={doc.id}>
                 <td className="doc-name">
                   <div className="doc-name-content">
-                    <span className="filename">{doc.filename}</span>
+                    <Link className="filename-link" to={`/documents/${doc.id}`}>
+                      <span className="filename">{doc.filename}</span>
+                    </Link>
                   </div>
                 </td>
                 <td className="doc-date">

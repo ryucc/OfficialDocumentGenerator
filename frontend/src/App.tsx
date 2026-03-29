@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from './auth'
 import './App.css'
 
 interface Message {
@@ -7,6 +9,7 @@ interface Message {
 }
 
 function App() {
+  const { status, user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -83,6 +86,19 @@ function App() {
             <div className="empty-state">
               <h1>公文產生器</h1>
               <p>貼上電子郵件，我將為您產生正式公文。</p>
+              <div className="auth-banner">
+                {status === 'authenticated' ? (
+                  <>
+                    <span>目前登入為 {user?.email || user?.userId}</span>
+                    <Link className="auth-banner-link" to="/documents">前往範例管理</Link>
+                  </>
+                ) : (
+                  <>
+                    <span>文件管理已改為 Cognito 驗證保護。</span>
+                    <Link className="auth-banner-link" to="/auth">前往登入</Link>
+                  </>
+                )}
+              </div>
               <div className="suggestions">
                 <button className="suggestion" onClick={() => setInput('請根據以下郵件產生正式回覆：\n\n')}>
                   產生正式回覆

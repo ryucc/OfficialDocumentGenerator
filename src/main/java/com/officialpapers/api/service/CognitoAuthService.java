@@ -1,30 +1,30 @@
 package com.officialpapers.api.service;
 
+import com.officialpapers.domain.AuthChallenge;
 import com.officialpapers.domain.AuthTokens;
 import com.officialpapers.domain.AuthenticatedUser;
+import com.officialpapers.domain.LoginResult;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthenticationResultType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ChallengeNameType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.CognitoIdentityProviderException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmForgotPasswordRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ConfirmSignUpRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ForgotPasswordRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.GlobalSignOutRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ResendConfirmationCodeRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.InitiateAuthResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.RespondToAuthChallengeRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.RevokeTokenRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.SignUpRequest;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Supplier;
 
 @Singleton
 public class CognitoAuthService implements AuthService {
@@ -42,63 +42,31 @@ public class CognitoAuthService implements AuthService {
     }
 
     @Override
-    public void signUp(String email, String password) {
+    public LoginResult login(String email, String password) {
+        String normalizedEmail = normalizeEmail(email);
         try {
-            cognitoClient.signUp(SignUpRequest.builder()
-                    .clientId(clientId)
-                    .username(normalizeEmail(email))
-                    .password(requireNonBlank(password, "password is required"))
-                    .userAttributes(List.of(AttributeType.builder()
-                            .name("email")
-                            .value(normalizeEmail(email))
-                            .build()))
-                    .build());
-        } catch (CognitoIdentityProviderException exception) {
-            throw mapException(exception, AuthOperation.SIGN_UP);
-        }
-    }
-
-    @Override
-    public void confirmSignUp(String email, String confirmationCode) {
-        try {
-            cognitoClient.confirmSignUp(ConfirmSignUpRequest.builder()
-                    .clientId(clientId)
-                    .username(normalizeEmail(email))
-                    .confirmationCode(requireNonBlank(confirmationCode, "confirmationCode is required"))
-                    .build());
-        } catch (CognitoIdentityProviderException exception) {
-            throw mapException(exception, AuthOperation.CONFIRM_SIGN_UP);
-        }
-    }
-
-    @Override
-    public void resendConfirmation(String email) {
-        try {
-            cognitoClient.resendConfirmationCode(ResendConfirmationCodeRequest.builder()
-                    .clientId(clientId)
-                    .username(normalizeEmail(email))
-                    .build());
-        } catch (CognitoIdentityProviderException exception) {
-            if (shouldSuppressExistenceFailure(exception, true)) {
-                return;
-            }
-            throw mapException(exception, AuthOperation.RESEND_CONFIRMATION);
-        }
-    }
-
-    @Override
-    public AuthTokens login(String email, String password) {
-        try {
-            AuthenticationResultType result = cognitoClient.initiateAuth(InitiateAuthRequest.builder()
+            InitiateAuthResponse response = cognitoClient.initiateAuth(InitiateAuthRequest.builder()
                             .clientId(clientId)
                             .authFlow(AuthFlowType.USER_PASSWORD_AUTH)
                             .authParameters(Map.of(
-                                    "USERNAME", normalizeEmail(email),
+                                    "USERNAME", normalizedEmail,
                                     "PASSWORD", requireNonBlank(password, "password is required")
                             ))
-                            .build())
-                    .authenticationResult();
-            return tokensFrom(result, null);
+                            .build());
+
+            if (response.authenticationResult() != null) {
+                return LoginResult.authenticated(tokensFrom(response.authenticationResult(), null));
+            }
+
+            if (response.challengeName() == ChallengeNameType.NEW_PASSWORD_REQUIRED) {
+                return LoginResult.challenged(new AuthChallenge(
+                        ChallengeNameType.NEW_PASSWORD_REQUIRED.toString(),
+                        requireNonBlank(response.session(), "Cognito session is required"),
+                        normalizedEmail
+                ));
+            }
+
+            throw new ServiceUnavailableException("COGNITO_UNAVAILABLE", "Authentication provider returned an unsupported challenge");
         } catch (CognitoIdentityProviderException exception) {
             throw mapException(exception, AuthOperation.LOGIN);
         }
@@ -121,6 +89,25 @@ public class CognitoAuthService implements AuthService {
     }
 
     @Override
+    public AuthTokens respondToNewPassword(String email, String newPassword, String session) {
+        try {
+            AuthenticationResultType result = cognitoClient.respondToAuthChallenge(RespondToAuthChallengeRequest.builder()
+                            .clientId(clientId)
+                            .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
+                            .session(requireNonBlank(session, "session is required"))
+                            .challengeResponses(Map.of(
+                                    "USERNAME", normalizeEmail(email),
+                                    "NEW_PASSWORD", requireNonBlank(newPassword, "newPassword is required")
+                            ))
+                            .build())
+                    .authenticationResult();
+            return tokensFrom(result, null);
+        } catch (CognitoIdentityProviderException exception) {
+            throw mapException(exception, AuthOperation.RESPOND_TO_NEW_PASSWORD);
+        }
+    }
+
+    @Override
     public void forgotPassword(String email) {
         try {
             cognitoClient.forgotPassword(ForgotPasswordRequest.builder()
@@ -128,7 +115,7 @@ public class CognitoAuthService implements AuthService {
                     .username(normalizeEmail(email))
                     .build());
         } catch (CognitoIdentityProviderException exception) {
-            if (shouldSuppressExistenceFailure(exception, false)) {
+            if (shouldSuppressMissingUser(exception)) {
                 return;
             }
             throw mapException(exception, AuthOperation.FORGOT_PASSWORD);
@@ -218,10 +205,6 @@ public class CognitoAuthService implements AuthService {
     private RuntimeException mapException(CognitoIdentityProviderException exception, AuthOperation operation) {
         String code = errorCode(exception);
         return switch (code) {
-            case "UsernameExistsException" ->
-                    new ConflictException("USER_ALREADY_EXISTS", "User already exists");
-            case "AliasExistsException" ->
-                    new ConflictException("EMAIL_ALREADY_IN_USE", "Email is already in use");
             case "CodeMismatchException" ->
                     new BadRequestException("Invalid confirmation code");
             case "ExpiredCodeException" ->
@@ -245,33 +228,23 @@ public class CognitoAuthService implements AuthService {
     }
 
     private RuntimeException mapInvalidParameter(CognitoIdentityProviderException exception, AuthOperation operation) {
-        if ((operation == AuthOperation.CONFIRM_SIGN_UP || operation == AuthOperation.RESEND_CONFIRMATION)
-                && containsIgnoreCase(exception.getMessage(), "confirmed")) {
-            return new ConflictException("USER_ALREADY_CONFIRMED", "User is already confirmed");
-        }
         return new BadRequestException(defaultInvalidParameterMessage(operation));
     }
 
     private RuntimeException mapNotAuthorized(CognitoIdentityProviderException exception, AuthOperation operation) {
-        if (operation == AuthOperation.CONFIRM_SIGN_UP && containsIgnoreCase(exception.getMessage(), "confirmed")) {
-            return new ConflictException("USER_ALREADY_CONFIRMED", "User is already confirmed");
-        }
         return switch (operation) {
             case LOGIN -> new UnauthorizedException("INVALID_CREDENTIALS", "Invalid email or password");
+            case RESPOND_TO_NEW_PASSWORD ->
+                    new UnauthorizedException("CHALLENGE_SESSION_INVALID", "Login challenge is invalid or expired");
             case REFRESH -> new UnauthorizedException("INVALID_REFRESH_TOKEN", "Refresh token is invalid or expired");
             case ME, LOGOUT -> new UnauthorizedException("UNAUTHORIZED", "Authentication failed");
             default -> new UnauthorizedException("UNAUTHORIZED", "Authentication failed");
         };
     }
 
-    private boolean shouldSuppressExistenceFailure(CognitoIdentityProviderException exception, boolean includeConfirmedUsers) {
+    private boolean shouldSuppressMissingUser(CognitoIdentityProviderException exception) {
         String code = errorCode(exception);
-        if ("UserNotFoundException".equals(code) || "NotAuthorizedException".equals(code)) {
-            return true;
-        }
-        return includeConfirmedUsers
-                && "InvalidParameterException".equals(code)
-                && containsIgnoreCase(exception.getMessage(), "confirmed");
+        return "UserNotFoundException".equals(code) || "NotAuthorizedException".equals(code);
     }
 
     private boolean shouldSuppressLogoutFailure(CognitoIdentityProviderException exception) {
@@ -309,22 +282,17 @@ public class CognitoAuthService implements AuthService {
 
     private String defaultInvalidParameterMessage(AuthOperation operation) {
         return switch (operation) {
-            case CONFIRM_SIGN_UP, CONFIRM_FORGOT_PASSWORD -> "Confirmation code is invalid";
+            case CONFIRM_FORGOT_PASSWORD -> "Confirmation code is invalid";
+            case RESPOND_TO_NEW_PASSWORD -> "Request parameters are invalid";
             case REFRESH -> "refreshToken is invalid";
             default -> "Request parameters are invalid";
         };
     }
 
-    private boolean containsIgnoreCase(String value, String fragment) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(fragment.toLowerCase(Locale.ROOT));
-    }
-
     private enum AuthOperation {
-        SIGN_UP,
-        CONFIRM_SIGN_UP,
-        RESEND_CONFIRMATION,
         LOGIN,
         REFRESH,
+        RESPOND_TO_NEW_PASSWORD,
         FORGOT_PASSWORD,
         CONFIRM_FORGOT_PASSWORD,
         LOGOUT,
