@@ -1,50 +1,42 @@
 plugins {
-	java
-	id("org.springframework.boot") version "3.2.3"
-	id("io.spring.dependency-management") version "1.1.4"
+    java
 }
 
 group = "com.officialpapers"
 version = "0.1.0"
 
 java {
-	sourceCompatibility = JavaVersion.VERSION_17
-}
-
-configurations {
-	compileOnly {
-		extendsFrom(configurations.annotationProcessor.get())
-	}
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
-	mavenCentral()
+    mavenCentral()
 }
 
 dependencies {
-	// Spring Boot Starters
-	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
 
-	// Database
-	runtimeOnly("com.h2database:h2")
-	runtimeOnly("org.postgresql:postgresql")
-
-	// Lombok
-	compileOnly("org.projectlombok:lombok")
-	annotationProcessor("org.projectlombok:lombok")
-
-	// OpenAPI Documentation
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0")
-
-	// Jackson
-	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-
-	// Testing
-	testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<Test> {
-	useJUnitPlatform()
+    useJUnitPlatform()
+}
+
+tasks.register<Zip>("packageLambda") {
+    from(tasks.named("compileJava"))
+    from(tasks.named("processResources"))
+    into("lib") {
+        from(configurations.runtimeClasspath)
+    }
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    archiveFileName.set("lambda.zip")
+}
+
+tasks.named("build") {
+    dependsOn("packageLambda")
 }
