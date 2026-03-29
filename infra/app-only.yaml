@@ -127,8 +127,6 @@ Resources:
 
   UploadedDocumentBucket:
     Type: AWS::S3::Bucket
-    DependsOn:
-      - EmailProcessingQueuePolicy
     Properties:
       CorsConfiguration:
         CorsRules:
@@ -309,6 +307,14 @@ Resources:
             BucketName: !Ref UploadedDocumentBucket
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailProcessingQueue.QueueName
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/email-processor-${Stage}:*
       Events:
         SQSEvent:
           Type: SQS
@@ -331,6 +337,14 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref ProjectsTable
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/projects-api-${Stage}:*
       Events:
         ListProjects:
           Type: Api
