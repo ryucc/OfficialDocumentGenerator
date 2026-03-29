@@ -14,7 +14,7 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
 import java.util.ArrayList;
 import java.util.List;
 
-final class OfficialDocumentDocxWriter {
+class OfficialDocumentDocxWriter {
 
     private static final int BODY_ELEMENTS_TO_KEEP = 23;
     private static final String ATTACHMENT_ONE_MARKER = "附件一";
@@ -22,7 +22,7 @@ final class OfficialDocumentDocxWriter {
     private static final String DEFAULT_ATTACHMENT_ONE_HEADING = "附件一：邀訪名單";
     private static final String DEFAULT_ATTACHMENT_TWO_HEADING = "附件二：預定行程表";
 
-    void write(XWPFDocument document, OfficialDocumentData data) {
+    XWPFDocument write(XWPFDocument document, OfficialDocumentData data) {
         trimTemplate(document);
         removeBlankParagraphsBeforeHeading(document, ATTACHMENT_ONE_MARKER);
         removeBlankParagraphsBeforeHeading(document, ATTACHMENT_TWO_MARKER);
@@ -46,15 +46,18 @@ final class OfficialDocumentDocxWriter {
         fillInviteeTable(document.getTables().get(1), data.inviteeAttachment().entries());
         fillFlightTable(document.getTables().get(2), data.scheduleAttachment().flights());
         fillItineraryTable(document.getTables().get(3), data.scheduleAttachment().itinerary());
+
+        return document;
     }
 
-    private void trimTemplate(XWPFDocument document) {
+    private XWPFDocument trimTemplate(XWPFDocument document) {
         while (document.getBodyElements().size() > BODY_ELEMENTS_TO_KEEP) {
             document.removeBodyElement(document.getBodyElements().size() - 1);
         }
+        return document;
     }
 
-    private void removeBlankParagraphsBeforeHeading(XWPFDocument document, String marker) {
+    private XWPFDocument removeBlankParagraphsBeforeHeading(XWPFDocument document, String marker) {
         XWPFParagraph heading = requireParagraphContaining(document, marker);
         int headingIndex = document.getPosOfParagraph(heading);
 
@@ -69,9 +72,10 @@ final class OfficialDocumentDocxWriter {
             document.removeBodyElement(headingIndex - 1);
             headingIndex--;
         }
+        return document;
     }
 
-    private void fillMainApplicationTable(XWPFTable table, OfficialDocumentData.ApplicationForm form) {
+    private XWPFTable fillMainApplicationTable(XWPFTable table, OfficialDocumentData.ApplicationForm form) {
         setCellLines(table.getRow(0).getCell(1), List.of(safeText(form.applicationUnit())));
         setCellLines(table.getRow(0).getCell(3), List.of(safeText(form.applicationDate())));
         setCellLines(table.getRow(1).getCell(3), List.of(safeText(form.documentNumber())));
@@ -98,9 +102,10 @@ final class OfficialDocumentDocxWriter {
         setCellLines(table.getRow(15).getCell(3), List.of(safeText(form.resultReportDate())));
         setCellLines(table.getRow(16).getCell(1), safeLines(form.noteLines()));
         setCellLines(table.getRow(17).getCell(1), safeLines(form.attachmentLines()));
+        return table;
     }
 
-    private void fillInviteeTable(XWPFTable table, List<OfficialDocumentData.InviteeEntry> entries) {
+    private XWPFTable fillInviteeTable(XWPFTable table, List<OfficialDocumentData.InviteeEntry> entries) {
         resizeDataRows(table, 2, entries.size(), 2);
 
         for (int index = 0; index < entries.size(); index++) {
@@ -117,9 +122,10 @@ final class OfficialDocumentDocxWriter {
             setCellLines(row.getCell(7), List.of(safeText(entry.effectiveness())));
             setCellLines(row.getCell(8), List.of(safeText(entry.note())));
         }
+        return table;
     }
 
-    private void fillFlightTable(XWPFTable table, List<OfficialDocumentData.FlightInfo> flights) {
+    private XWPFTable fillFlightTable(XWPFTable table, List<OfficialDocumentData.FlightInfo> flights) {
         resizeDataRows(table, 1, flights.size(), 1);
 
         for (int index = 0; index < flights.size(); index++) {
@@ -131,9 +137,10 @@ final class OfficialDocumentDocxWriter {
             setCellLines(row.getCell(2), List.of(safeText(flight.departureTime())));
             setCellLines(row.getCell(3), List.of(safeText(flight.arrivalTime())));
         }
+        return table;
     }
 
-    private void fillItineraryTable(XWPFTable table, List<OfficialDocumentData.ItineraryRow> itinerary) {
+    private XWPFTable fillItineraryTable(XWPFTable table, List<OfficialDocumentData.ItineraryRow> itinerary) {
         resizeDataRows(table, 1, itinerary.size(), 1);
 
         for (int index = 0; index < itinerary.size(); index++) {
@@ -144,9 +151,10 @@ final class OfficialDocumentDocxWriter {
             setCellLines(row.getCell(1), safeLines(item.itineraryLines()));
             setCellLines(row.getCell(2), safeLines(item.accommodationLines()));
         }
+        return table;
     }
 
-    private void resizeDataRows(XWPFTable table, int startRowIndex, int desiredRowCount, int templateRowIndex) {
+    private XWPFTable resizeDataRows(XWPFTable table, int startRowIndex, int desiredRowCount, int templateRowIndex) {
         while (table.getNumberOfRows() > startRowIndex + desiredRowCount) {
             table.removeRow(table.getNumberOfRows() - 1);
         }
@@ -155,6 +163,7 @@ final class OfficialDocumentDocxWriter {
         while (table.getNumberOfRows() < startRowIndex + desiredRowCount) {
             table.addRow(cloneRow(table, templateRow));
         }
+        return table;
     }
 
     private XWPFTableRow cloneRow(XWPFTable table, XWPFTableRow templateRow) {
@@ -178,7 +187,7 @@ final class OfficialDocumentDocxWriter {
         throw new IllegalStateException("Expected paragraph containing marker: " + marker);
     }
 
-    private void setParagraphText(XWPFParagraph paragraph, String text) {
+    private XWPFParagraph setParagraphText(XWPFParagraph paragraph, String text) {
         CTRPr templateRunProperties = copyRunProperties(paragraph);
         clearRuns(paragraph);
 
@@ -187,13 +196,15 @@ final class OfficialDocumentDocxWriter {
             run.getCTR().setRPr((CTRPr) templateRunProperties.copy());
         }
         run.setText(text);
+        return paragraph;
     }
 
-    private void setPageBreakBefore(XWPFParagraph paragraph) {
+    private XWPFParagraph setPageBreakBefore(XWPFParagraph paragraph) {
         paragraph.setPageBreak(true);
+        return paragraph;
     }
 
-    private void setCellLines(XWPFTableCell cell, List<String> lines) {
+    private XWPFTableCell setCellLines(XWPFTableCell cell, List<String> lines) {
         List<String> resolvedLines = safeLines(lines);
         List<XWPFParagraph> paragraphs = new ArrayList<>(cell.getParagraphs());
         CTPPr templateParagraphProperties = paragraphs.isEmpty()
@@ -223,12 +234,14 @@ final class OfficialDocumentDocxWriter {
             }
             run.setText(resolvedLines.get(index));
         }
+        return cell;
     }
 
-    private void clearRuns(XWPFParagraph paragraph) {
+    private XWPFParagraph clearRuns(XWPFParagraph paragraph) {
         for (int index = paragraph.getRuns().size() - 1; index >= 0; index--) {
             paragraph.removeRun(index);
         }
+        return paragraph;
     }
 
     private CTRPr copyRunProperties(XWPFParagraph paragraph) {

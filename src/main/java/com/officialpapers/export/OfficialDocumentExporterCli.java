@@ -2,7 +2,7 @@ package com.officialpapers.export;
 
 import java.nio.file.Path;
 
-public final class OfficialDocumentExporterCli {
+public class OfficialDocumentExporterCli {
 
     private static final String INPUT_JSON_PROPERTY = "officialDocument.inputJson";
     private static final String OUTPUT_DIR_PROPERTY = "officialDocument.outputDir";
