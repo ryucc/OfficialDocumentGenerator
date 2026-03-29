@@ -11,35 +11,51 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-class OfficialDocumentDocxWriter {
+class OfficialDocumentDocxGenerator {
 
-    private static final int BODY_ELEMENTS_TO_KEEP = 23;
-    private static final String ATTACHMENT_ONE_MARKER = "附件一";
-    private static final String ATTACHMENT_TWO_MARKER = "附件二";
-    private static final String DEFAULT_ATTACHMENT_ONE_HEADING = "附件一：邀訪名單";
-    private static final String DEFAULT_ATTACHMENT_TWO_HEADING = "附件二：預定行程表";
+    private final OfficialDocumentGeneratorConfig config;
 
-    XWPFDocument write(XWPFDocument document, OfficialDocumentData data) {
+    OfficialDocumentDocxGenerator(OfficialDocumentGeneratorConfig config) {
+        this.config = config;
+    }
+
+    GeneratedFile generate(OfficialDocumentData data) throws IOException {
+        try (InputStream templateStream = openTemplate();
+             XWPFDocument document = new XWPFDocument(templateStream);
+             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+
+            populateDocument(document, data);
+            document.write(outputStream);
+
+            String fileName = buildOutputFilename(data);
+            return new GeneratedFile(fileName, outputStream.toByteArray());
+        }
+    }
+
+    private XWPFDocument populateDocument(XWPFDocument document, OfficialDocumentData data) {
         trimTemplate(document);
-        removeBlankParagraphsBeforeHeading(document, ATTACHMENT_ONE_MARKER);
-        removeBlankParagraphsBeforeHeading(document, ATTACHMENT_TWO_MARKER);
+        removeBlankParagraphsBeforeHeading(document, config.attachmentOneMarker());
+        removeBlankParagraphsBeforeHeading(document, config.attachmentTwoMarker());
 
-        XWPFParagraph attachmentOneHeading = requireParagraphContaining(document, ATTACHMENT_ONE_MARKER);
-        XWPFParagraph attachmentTwoHeading = requireParagraphContaining(document, ATTACHMENT_TWO_MARKER);
+        XWPFParagraph attachmentOneHeading = requireParagraphContaining(document, config.attachmentOneMarker());
+        XWPFParagraph attachmentTwoHeading = requireParagraphContaining(document, config.attachmentTwoMarker());
 
         setParagraphText(requireParagraph(document, 0), safeText(data.title()));
         setPageBreakBefore(attachmentOneHeading);
         setParagraphText(
                 attachmentOneHeading,
-                valueOrDefault(data.inviteeAttachment().heading(), DEFAULT_ATTACHMENT_ONE_HEADING)
+                valueOrDefault(data.inviteeAttachment().heading(), config.defaultAttachmentOneHeading())
         );
         setPageBreakBefore(attachmentTwoHeading);
         setParagraphText(
                 attachmentTwoHeading,
-                valueOrDefault(data.scheduleAttachment().heading(), DEFAULT_ATTACHMENT_TWO_HEADING)
+                valueOrDefault(data.scheduleAttachment().heading(), config.defaultAttachmentTwoHeading())
         );
 
         fillMainApplicationTable(document.getTables().get(0), data.applicationForm());
@@ -50,8 +66,21 @@ class OfficialDocumentDocxWriter {
         return document;
     }
 
+    private InputStream openTemplate() {
+        InputStream templateStream = OfficialDocumentDocxGenerator.class.getResourceAsStream(config.templateResourcePath());
+        if (templateStream == null) {
+            throw new IllegalStateException("Template not found on classpath: " + config.templateResourcePath());
+        }
+        return templateStream;
+    }
+
+    private String buildOutputFilename(OfficialDocumentData data) {
+        String rawName = data.outputFileBaseName().trim() + ".docx";
+        return rawName.replaceAll("[\\\\/:*?\"<>|]", "_");
+    }
+
     private XWPFDocument trimTemplate(XWPFDocument document) {
-        while (document.getBodyElements().size() > BODY_ELEMENTS_TO_KEEP) {
+        while (document.getBodyElements().size() > config.bodyElementsToKeep()) {
             document.removeBodyElement(document.getBodyElements().size() - 1);
         }
         return document;
