@@ -241,17 +241,15 @@ Resources:
             TableName: !Ref ReceivedEmailTable
         - S3ReadPolicy:
             BucketName: !Ref UploadedDocumentBucket
-      Events:
-        S3Event:
-          Type: S3
-          Properties:
-            Bucket: !Ref UploadedDocumentBucket
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: !Sub emails/${Stage}/
+
+  # Lambda permission for S3 to invoke metadata function
+  EmailMetadataFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EmailMetadataFunction
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
 
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
