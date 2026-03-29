@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import './index.css'
@@ -6,41 +6,55 @@ import App from './App.tsx'
 import Documents from './Documents.tsx'
 import Projects from './Projects.tsx'
 
-function Navigation() {
+function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (theme: 'dark' | 'light') => void }) {
   const location = useLocation()
 
   return (
     <nav className="top-nav">
-      <Link
-        to="/"
-        className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
-      >
-        公文產生器
-      </Link>
-      <Link
-        to="/documents"
-        className={`nav-link ${location.pathname === '/documents' ? 'active' : ''}`}
-      >
-        範例管理
-      </Link>
-      <Link
-        to="/projects"
-        className={`nav-link ${location.pathname === '/projects' ? 'active' : ''}`}
-      >
-        郵件專案
-      </Link>
+      <div className="nav-links">
+        <Link
+          to="/"
+          className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
+        >
+          郵件專案
+        </Link>
+        <Link
+          to="/documents"
+          className={`nav-link ${location.pathname === '/documents' ? 'active' : ''}`}
+        >
+          範例管理
+        </Link>
+        <Link
+          to="/generator"
+          className={`nav-link ${location.pathname === '/generator' ? 'active' : ''}`}
+        >
+          公文產生器
+        </Link>
+      </div>
+      <button className="theme-toggle-nav" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
     </nav>
   )
 }
 
 function AppRouter() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'light'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
   return (
     <>
-      <Navigation />
+      <Navigation theme={theme} setTheme={setTheme} />
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<Projects />} />
         <Route path="/documents" element={<Documents />} />
-        <Route path="/projects" element={<Projects />} />
+        <Route path="/generator" element={<App />} />
       </Routes>
     </>
   )

@@ -58,6 +58,8 @@ body {
 /* Navigation */
 .top-nav {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 1rem;
   padding: 1rem 2rem;
   background: var(--bg-sidebar);
@@ -65,6 +67,11 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
 }
 
 .nav-link {
@@ -84,6 +91,25 @@ body {
 .nav-link.active {
   background: var(--accent);
   color: white;
+}
+
+.theme-toggle-nav {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border-btn);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+}
+
+.theme-toggle-nav:hover {
+  background: var(--hover);
 }
 
 /* Make app content fill remaining space */

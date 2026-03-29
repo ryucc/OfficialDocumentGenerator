@@ -124,13 +124,6 @@ function Projects() {
             <option value="in_progress">處理中</option>
             <option value="finished">已完成</option>
           </select>
-          <button onClick={fetchProjects} className="refresh-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            重新整理
-          </button>
         </div>
       </div>
 
