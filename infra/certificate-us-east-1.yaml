@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SSL Certificate for CloudFront/Amplify (us-east-1)
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: gongwengpt.click
+    Description: Root domain name for frontend
+  HostedZoneId:
+    Type: String
+    Default: Z08801051G2GR30IAD1A4
+    Description: Route 53 Hosted Zone ID
+
+Resources:
+  FrontendCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+Outputs:
+  CertificateArn:
+    Description: Certificate ARN for CloudFront/Amplify
+    Value: !Ref FrontendCertificate
+    Export:
+      Name: FrontendCertificateArn

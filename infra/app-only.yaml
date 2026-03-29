@@ -11,14 +11,18 @@ Parameters:
     Type: CommaDelimitedList
     Default: "shortyliu@gmail.com"
     Description: Comma-separated list of allowed sender email addresses for ai@gongwengpt.click (leave empty to allow all)
-  DomainName:
+  EmailDomainName:
     Type: String
     Default: gongwengpt.click
     Description: Domain name for email receiving
-  Route53HostedZoneId:
+  ApiDomainName:
     Type: String
-    Description: Route 53 Hosted Zone ID for the domain (leave empty to skip DNS setup)
-    Default: ""
+    Default: api.gongwengpt.click
+    Description: Custom domain name for API Gateway
+  HostedZoneId:
+    Type: String
+    Default: Z08801051G2GR30IAD1A4
+    Description: Route 53 Hosted Zone ID for gongwengpt.click
 
 Globals:
   Function:
@@ -265,7 +269,7 @@ Resources:
         Enabled: true
         ScanEnabled: true
         Recipients:
-          - !Sub ai@${DomainName}
+          - !Sub ai@${EmailDomainName}
         Actions:
           # First: Filter by Lambda
           - LambdaAction:
@@ -303,7 +307,7 @@ Resources:
       - EmailReceiptRule
     Properties:
       ServiceToken: !GetAtt SESSetupFunction.Arn
-      Domain: !Ref DomainName
+      Domain: !Ref EmailDomainName
       RuleSetName: !Ref EmailReceiptRuleSet
 
   # ---- Route 53 DNS Records (optional) ----
@@ -313,8 +317,8 @@ Resources:
     Type: AWS::Route53::RecordSet
     Condition: HasHostedZone
     Properties:
-      HostedZoneId: !Ref Route53HostedZoneId
-      Name: !Ref DomainName
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref EmailDomainName
       Type: MX
       TTL: 300
       ResourceRecords:
@@ -326,20 +330,61 @@ Resources:
     Condition: HasHostedZone
     DependsOn: SESSetup
     Properties:
-      HostedZoneId: !Ref Route53HostedZoneId
-      Name: !Sub _amazonses.${DomainName}
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub _amazonses.${EmailDomainName}
       Type: TXT
       TTL: 300
       ResourceRecords:
         - !Sub '"${SESSetup.VerificationToken}"'
 
+  # ---- API Custom Domain Resources ----
+
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref ApiDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref ApiDomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref ApiDomainName
+      RegionalCertificateArn: !Ref ApiCertificate
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !Ref ApiCustomDomain
+      RestApiId: !Ref DocumentApi
+      Stage: Prod
+
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
+        EvaluateTargetHealth: false
+
 Conditions:
-  HasHostedZone: !Not [!Equals [!Ref Route53HostedZoneId, ""]]
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
 
 Outputs:
   ApiUrl:
     Description: API Gateway URL
     Value: !Sub https://${DocumentApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/sample-documents
+  CustomApiUrl:
+    Description: Custom Domain API URL
+    Value: !Sub https://${ApiDomainName}/api/v1/sample-documents
   TableName:
     Value: !Ref UploadedDocumentTable
   BucketName:
@@ -367,7 +412,7 @@ Outputs:
     Value: !Ref EmailFilterFunction
   EmailAddress:
     Description: Email address for receiving emails
-    Value: !Sub ai@${DomainName}
+    Value: !Sub ai@${EmailDomainName}
   SESVerificationToken:
-    Description: SES domain verification token (already applied if Route53HostedZoneId provided)
+    Description: SES domain verification token (already applied if HostedZoneId provided)
     Value: !GetAtt SESSetup.VerificationToken
