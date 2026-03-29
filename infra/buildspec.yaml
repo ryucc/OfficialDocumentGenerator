@@ -8,6 +8,8 @@ phases:
     commands:
       - chmod +x gradlew
       - ./gradlew clean build
+      - sam validate --lint -t infra/app-only.yaml --region ap-northeast-1
+      - sam validate --lint -t infra/template.yaml --region ap-northeast-1
       - sam package --template-file infra/app-only.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
 
 artifacts:
