@@ -109,6 +109,162 @@ class AuthHandlerTest {
         assertEquals("UNAUTHORIZED", body.get("code").asText());
     }
 
+    @Test
+    void signupCallsAuthService() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/signup", "{\"email\":\"user@example.com\",\"password\":\"secret-password\"}", null),
+                null
+        );
+
+        verify(authService).signUp("user@example.com", "secret-password");
+        assertEquals(204, response.getStatusCode());
+    }
+
+    @Test
+    void confirmSignupCallsAuthService() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/confirm-signup", "{\"email\":\"user@example.com\",\"confirmationCode\":\"123456\"}", null),
+                null
+        );
+
+        verify(authService).confirmSignUp("user@example.com", "123456");
+        assertEquals(204, response.getStatusCode());
+    }
+
+    @Test
+    void resendConfirmationCallsAuthService() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/resend-confirmation", "{\"email\":\"user@example.com\"}", null),
+                null
+        );
+
+        verify(authService).resendConfirmation("user@example.com");
+        assertEquals(204, response.getStatusCode());
+    }
+
+    @Test
+    void refreshCallsAuthService() throws Exception {
+        when(authService.refresh("refresh-token")).thenReturn(
+                new AuthTokens("new-access", "new-id", "refresh-token", "Bearer", 3600)
+        );
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/refresh", "{\"refreshToken\":\"refresh-token\"}", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(200, response.getStatusCode());
+        assertEquals("new-access", body.get("accessToken").asText());
+    }
+
+    @Test
+    void forgotPasswordCallsAuthService() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/forgot-password", "{\"email\":\"user@example.com\"}", null),
+                null
+        );
+
+        verify(authService).forgotPassword("user@example.com");
+        assertEquals(204, response.getStatusCode());
+    }
+
+    @Test
+    void confirmForgotPasswordCallsAuthService() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/confirm-forgot-password",
+                        "{\"email\":\"user@example.com\",\"confirmationCode\":\"123456\",\"newPassword\":\"new-secret\"}", null),
+                null
+        );
+
+        verify(authService).confirmForgotPassword("user@example.com", "123456", "new-secret");
+        assertEquals(204, response.getStatusCode());
+    }
+
+    @Test
+    void missingRequiredFieldReturns400() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/login", "{\"email\":\"user@example.com\"}", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(400, response.getStatusCode());
+        assertEquals("BAD_REQUEST", body.get("code").asText());
+        assertTrue(body.get("message").asText().contains("password"));
+    }
+
+    @Test
+    void emptyBodyReturns400() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/login", "", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(400, response.getStatusCode());
+        assertEquals("BAD_REQUEST", body.get("code").asText());
+    }
+
+    @Test
+    void invalidJsonReturns400() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/login", "{invalid json", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(400, response.getStatusCode());
+        assertEquals("BAD_REQUEST", body.get("code").asText());
+    }
+
+    @Test
+    void nonObjectBodyReturns400() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("POST", "/api/v1/auth/login", "[]", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(400, response.getStatusCode());
+        assertEquals("BAD_REQUEST", body.get("code").asText());
+    }
+
+    @Test
+    void optionsRequestReturns204WithCorsHeaders() {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("OPTIONS", "/api/v1/auth/login", null, null),
+                null
+        );
+
+        assertEquals(204, response.getStatusCode());
+        assertTrue(response.getHeaders().containsKey("Access-Control-Allow-Origin"));
+    }
+
+    @Test
+    void unknownRouteReturns404() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("GET", "/api/v1/auth/unknown", null, null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(404, response.getStatusCode());
+        assertEquals("NOT_FOUND", body.get("code").asText());
+    }
+
+    @Test
+    void unsupportedMethodReturns405() throws Exception {
+        APIGatewayProxyResponseEvent response = handler.handleRequest(
+                request("PUT", "/api/v1/auth/login", "{}", null),
+                null
+        );
+
+        JsonNode body = objectMapper.readTree(response.getBody());
+        assertEquals(405, response.getStatusCode());
+        assertEquals("METHOD_NOT_ALLOWED", body.get("code").asText());
+    }
+
     private static APIGatewayProxyRequestEvent request(
             String method,
             String path,
