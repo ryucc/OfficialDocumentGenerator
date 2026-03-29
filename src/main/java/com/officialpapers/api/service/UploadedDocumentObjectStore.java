@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface UploadedDocumentObjectStore {
 
-    UploadTarget createUploadTarget(String objectKey, Duration expiry);
+    UploadTarget createUploadTarget(String objectKey, String contentType, Duration expiry);
 
     DownloadTarget createDownloadTarget(String objectKey, Duration expiry);
 

@@ -72,8 +72,10 @@ class UploadedDocumentServiceTest {
         assertEquals("2026-03-29T06:00:00Z", created.document().createdAt());
         assertEquals("2026-03-29T06:15:00Z", created.upload().expiresAt());
         assertEquals("PUT", created.upload().uploadMethod());
+        assertEquals("application/pdf", created.upload().uploadHeaders().get("Content-Type"));
         assertEquals(created.document(), repository.findById(created.document().id()).orElseThrow());
         assertEquals(created.document().sourceObjectKey(), objectStore.lastUploadObjectKey);
+        assertEquals("application/pdf", objectStore.lastUploadContentType);
         assertEquals(Duration.ofMinutes(15), objectStore.lastUploadExpiry);
     }
 
@@ -303,19 +305,21 @@ class UploadedDocumentServiceTest {
         private final List<String> deletedKeys = new ArrayList<>();
         private RuntimeException deleteException;
         private String lastUploadObjectKey;
+        private String lastUploadContentType;
         private Duration lastUploadExpiry;
         private String lastDownloadObjectKey;
         private Duration lastDownloadExpiry;
         private int getObjectSizeCalls;
 
         @Override
-        public UploadTarget createUploadTarget(String objectKey, Duration expiry) {
+        public UploadTarget createUploadTarget(String objectKey, String contentType, Duration expiry) {
             lastUploadObjectKey = objectKey;
+            lastUploadContentType = contentType;
             lastUploadExpiry = expiry;
             return new UploadTarget(
                     "https://upload.example.com/object",
                     "PUT",
-                    Map.of("Content-Type", "application/octet-stream"),
+                    Map.of("Content-Type", contentType),
                     "2026-03-29T06:15:00Z"
             );
         }

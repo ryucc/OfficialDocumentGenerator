@@ -39,19 +39,20 @@ public class S3UploadedDocumentObjectStore implements UploadedDocumentObjectStor
     }
 
     @Override
-    public UploadTarget createUploadTarget(String objectKey, Duration expiry) {
+    public UploadTarget createUploadTarget(String objectKey, String contentType, Duration expiry) {
         PresignedPutObjectRequest request = s3Presigner.presignPutObject(PutObjectPresignRequest.builder()
                 .signatureDuration(expiry)
                 .putObjectRequest(PutObjectRequest.builder()
                         .bucket(bucketName)
                         .key(objectKey)
+                        .contentType(contentType)
                         .build())
                 .build());
 
         return new UploadTarget(
                 request.url().toString(),
                 request.httpRequest().method().name(),
-                Map.of(),
+                Map.of("Content-Type", contentType),
                 request.expiration().toString()
         );
     }

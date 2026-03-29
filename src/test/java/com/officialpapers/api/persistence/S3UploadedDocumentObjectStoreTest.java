@@ -58,16 +58,18 @@ class S3UploadedDocumentObjectStoreTest {
         when(s3Presigner.presignPutObject(org.mockito.ArgumentMatchers.any(PutObjectPresignRequest.class))).thenReturn(presignedRequest);
 
         com.officialpapers.domain.UploadTarget uploadTarget =
-                store.createUploadTarget("sample-documents/id/memo.pdf", Duration.ofMinutes(15));
+                store.createUploadTarget("sample-documents/id/memo.pdf", "application/pdf", Duration.ofMinutes(15));
 
         ArgumentCaptor<PutObjectPresignRequest> captor = ArgumentCaptor.forClass(PutObjectPresignRequest.class);
         verify(s3Presigner).presignPutObject(captor.capture());
 
         assertEquals("uploaded-documents-test", captor.getValue().putObjectRequest().bucket());
         assertEquals("sample-documents/id/memo.pdf", captor.getValue().putObjectRequest().key());
+        assertEquals("application/pdf", captor.getValue().putObjectRequest().contentType());
         assertEquals(Duration.ofMinutes(15), captor.getValue().signatureDuration());
         assertEquals("https://upload.example.com/object", uploadTarget.uploadUrl());
         assertEquals("PUT", uploadTarget.uploadMethod());
+        assertEquals("application/pdf", uploadTarget.uploadHeaders().get("Content-Type"));
         assertEquals("2026-03-29T06:15:00Z", uploadTarget.expiresAt());
     }
 

@@ -85,7 +85,11 @@ public class UploadedDocumentService {
         );
 
         repository.save(document);
-        UploadTarget uploadTarget = objectStore.createUploadTarget(document.sourceObjectKey(), URL_EXPIRY);
+        UploadTarget uploadTarget = objectStore.createUploadTarget(
+                document.sourceObjectKey(),
+                document.contentType(),
+                URL_EXPIRY
+        );
         return new CreatedUpload(document, uploadTarget);
     }
 
