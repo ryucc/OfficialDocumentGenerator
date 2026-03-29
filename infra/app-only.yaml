@@ -68,6 +68,13 @@ Resources:
                 - s3:PutObject
                 - s3:DeleteObject
               Resource: !Sub ${UploadedDocumentBucket.Arn}/*
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/sample-document-${Stage}:*
       Events:
         ListSampleDocuments:
           Type: Api
@@ -193,6 +200,14 @@ Resources:
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref UploadedDocumentBucket
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/email-filter-${Stage}:*
 
   # Lambda permission for SES to invoke the filter function
   EmailFilterFunctionPermission:
@@ -249,6 +264,13 @@ Resources:
                 - ses:SetActiveReceiptRuleSet
                 - ses:DescribeActiveReceiptRuleSet
               Resource: '*'
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ses-setup-${Stage}:*
 
   # Custom resource to verify domain and activate rule set
   SESSetup:
