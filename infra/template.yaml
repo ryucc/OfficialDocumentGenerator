@@ -34,7 +34,7 @@ Resources:
     Properties:
       FunctionName: !Sub document-instruction-${Stage}
       Handler: com.officialpapers.api.handler.DocumentInstructionHandler
-      CodeUri: build/distributions/lambda.zip
+      CodeUri: ../build/distributions/lambda.zip
       Events:
         ListInstructions:
           Type: Api
@@ -178,7 +178,7 @@ Resources:
         Image: aws/codebuild/amazonlinux2-x86_64-standard:corretto17
       Source:
         Type: CODEPIPELINE
-        BuildSpec: buildspec.yml
+        BuildSpec: infra/buildspec.yaml
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
