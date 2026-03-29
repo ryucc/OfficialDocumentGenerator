@@ -9,11 +9,46 @@ Globals:
     Timeout: 30
 
 Resources:
+  InstructionMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: instructionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: instructionId
+          KeyType: HASH
+
+  InstructionContentBucket:
+    Type: AWS::S3::Bucket
+
   DocumentInstructionFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: com.officialpapers.api.handler.DocumentInstructionHandler
       CodeUri: build/distributions/lambda.zip
+      Environment:
+        Variables:
+          INSTRUCTION_METADATA_TABLE: !Ref InstructionMetadataTable
+          INSTRUCTION_CONTENT_BUCKET: !Ref InstructionContentBucket
+      Policies:
+        - Statement:
+            - Sid: InstructionMetadataAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+                - dynamodb:Scan
+              Resource: !GetAtt InstructionMetadataTable.Arn
+            - Sid: InstructionContentAccess
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub ${InstructionContentBucket.Arn}/*
       Events:
         ListInstructions:
           Type: Api
@@ -45,3 +80,9 @@ Outputs:
   ApiUrl:
     Description: API Gateway URL
     Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/document-instructions
+  InstructionMetadataTableName:
+    Description: DynamoDB table for instruction metadata
+    Value: !Ref InstructionMetadataTable
+  InstructionContentBucketName:
+    Description: S3 bucket for instruction content
+    Value: !Ref InstructionContentBucket
