@@ -2,6 +2,7 @@ package com.officialpapers.domain;
 
 public record UploadedDocument(
         String id,
+        String ownerUserId,
         String filename,
         String contentType,
         Long sizeBytes,

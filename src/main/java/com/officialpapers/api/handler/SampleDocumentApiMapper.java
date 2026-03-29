@@ -24,7 +24,7 @@ public class SampleDocumentApiMapper {
 
     private static final Map<String, String> CORS_HEADERS = Map.of(
             "Access-Control-Allow-Origin", "*",
-            "Access-Control-Allow-Headers", "Content-Type",
+            "Access-Control-Allow-Headers", "Content-Type,Authorization",
             "Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS",
             "Content-Type", "application/json"
     );

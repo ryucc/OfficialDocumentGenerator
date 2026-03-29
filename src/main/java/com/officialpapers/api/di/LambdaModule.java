@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.persistence.DynamoDbUploadedDocumentRepository;
 import com.officialpapers.api.persistence.S3UploadedDocumentObjectStore;
+import com.officialpapers.api.service.AuthService;
+import com.officialpapers.api.service.CognitoAuthService;
 import com.officialpapers.api.service.InstructionRecompileTrigger;
 import com.officialpapers.api.service.NoOpInstructionRecompileTrigger;
 import com.officialpapers.api.service.UploadedDocumentObjectStore;
 import com.officialpapers.api.service.UploadedDocumentRepository;
 import dagger.Module;
 import dagger.Provides;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -44,6 +47,12 @@ public interface LambdaModule {
 
     @Provides
     @Singleton
+    static CognitoIdentityProviderClient provideCognitoIdentityProviderClient() {
+        return CognitoIdentityProviderClient.create();
+    }
+
+    @Provides
+    @Singleton
     static S3Client provideS3Client() {
         return S3Client.create();
     }
@@ -67,6 +76,18 @@ public interface LambdaModule {
     }
 
     @Provides
+    @Named("cognitoUserPoolId")
+    static String provideCognitoUserPoolId() {
+        return requireEnvironmentVariable("COGNITO_USER_POOL_ID");
+    }
+
+    @Provides
+    @Named("cognitoUserPoolClientId")
+    static String provideCognitoUserPoolClientId() {
+        return requireEnvironmentVariable("COGNITO_USER_POOL_CLIENT_ID");
+    }
+
+    @Provides
     @Singleton
     static UploadedDocumentRepository provideUploadedDocumentRepository(
             DynamoDbUploadedDocumentRepository repository
@@ -80,6 +101,14 @@ public interface LambdaModule {
             S3UploadedDocumentObjectStore store
     ) {
         return store;
+    }
+
+    @Provides
+    @Singleton
+    static AuthService provideAuthService(
+            CognitoAuthService service
+    ) {
+        return service;
     }
 
     @Provides

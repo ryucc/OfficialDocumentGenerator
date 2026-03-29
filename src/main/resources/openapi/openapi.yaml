@@ -1,16 +1,11 @@
 openapi: 3.1.0
 info:
   title: Official Document Generator API
-  version: 0.1.0
-  summary: API for managing uploaded sample documents
+  version: 0.2.0
+  summary: API for Cognito authentication and user-scoped sample documents
   description: |
-    This API supports a dropbox-style file library for sample official documents.
-
-    The current browser client is intentionally scoped to the phase-1 document flow:
-    list uploaded sample documents, create an upload session, upload the binary to the
-    returned presigned URL, finalize the upload, request a download URL, and delete a
-    document. Chat history and document rename/replace endpoints are not part of the
-    published contract yet and should be treated as future work.
+    This API supports email/password authentication backed by Amazon Cognito and
+    a user-scoped file library for sample official documents.
 
 servers:
   - url: http://127.0.0.1:3000/api/v1
@@ -21,15 +16,237 @@ servers:
     description: Staging
 
 tags:
+  - name: Authentication
   - name: Sample Documents
 
 paths:
+  /auth/signup:
+    post:
+      tags: [Authentication]
+      summary: Create a user account
+      operationId: signUp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '204':
+          description: Account created successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/confirm-signup:
+    post:
+      tags: [Authentication]
+      summary: Confirm a newly created user account
+      operationId: confirmSignUp
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmSignUpRequest'
+      responses:
+        '204':
+          description: Signup confirmed successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/resend-confirmation:
+    post:
+      tags: [Authentication]
+      summary: Resend the signup confirmation code
+      operationId: resendConfirmation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '204':
+          description: Confirmation email accepted for delivery
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Exchange email and password for Cognito tokens
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access and ID tokens
+      operationId: refreshTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Begin password reset
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '204':
+          description: Password reset accepted for delivery
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/confirm-forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Confirm password reset with a verification code
+      operationId: confirmForgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmForgotPasswordRequest'
+      responses:
+        '204':
+          description: Password reset successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current session
+      operationId: logout
+      security:
+        - CognitoBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Session revoked successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Return the current authenticated user
+      operationId: getCurrentUser
+      security:
+        - CognitoBearerAuth: []
+      responses:
+        '200':
+          description: Current user returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /sample-documents:
     get:
       tags: [Sample Documents]
-      summary: List uploaded sample documents
-      description: Returns the metadata ledger consumed by the current frontend document table.
+      summary: List uploaded sample documents for the authenticated user
       operationId: listSampleDocuments
+      security:
+        - CognitoBearerAuth: []
       responses:
         '200':
           description: Documents returned successfully
@@ -37,16 +254,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SampleDocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
       tags: [Sample Documents]
-      summary: Create an upload session for a sample document
-      description: |
-        Creates a metadata record in `PENDING_UPLOAD` state and returns a presigned upload
-        target. The client must upload the binary to `upload.uploadUrl` and then call
-        `POST /sample-documents/{documentId}/complete`.
+      summary: Create an upload session for an authenticated user's sample document
       operationId: createSampleDocument
+      security:
+        - CognitoBearerAuth: []
       requestBody:
         required: true
         content:
@@ -62,14 +279,18 @@ paths:
                 $ref: '#/components/schemas/CreateSampleDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
   /sample-documents/{documentId}:
     get:
       tags: [Sample Documents]
-      summary: Get a sample document metadata record
+      summary: Get a user-scoped sample document metadata record
       operationId: getSampleDocument
+      security:
+        - CognitoBearerAuth: []
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -81,14 +302,18 @@ paths:
                 $ref: '#/components/schemas/SampleDocument'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
       tags: [Sample Documents]
-      summary: Delete an uploaded sample document
+      summary: Delete a user-scoped sample document
       operationId: deleteSampleDocument
+      security:
+        - CognitoBearerAuth: []
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -96,6 +321,8 @@ paths:
           description: Document deleted successfully
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -104,9 +331,10 @@ paths:
   /sample-documents/{documentId}/complete:
     post:
       tags: [Sample Documents]
-      summary: Finalize a sample document upload
-      description: Marks a previously created upload session as available after the object exists in storage.
+      summary: Finalize a user-scoped sample document upload
       operationId: completeSampleDocumentUpload
+      security:
+        - CognitoBearerAuth: []
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -118,6 +346,8 @@ paths:
                 $ref: '#/components/schemas/SampleDocument'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -128,9 +358,10 @@ paths:
   /sample-documents/{documentId}/download-url:
     get:
       tags: [Sample Documents]
-      summary: Create a presigned download URL for a sample document
-      description: Returns a temporary download target for an `AVAILABLE` document.
+      summary: Create a presigned download URL for a user-scoped sample document
       operationId: getSampleDocumentDownloadUrl
+      security:
+        - CognitoBearerAuth: []
       parameters:
         - $ref: '#/components/parameters/DocumentId'
       responses:
@@ -142,6 +373,8 @@ paths:
                 $ref: '#/components/schemas/DownloadTarget'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -150,6 +383,12 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
 components:
+  securitySchemes:
+    CognitoBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   parameters:
     DocumentId:
       name: documentId
@@ -166,6 +405,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Authentication is required or has failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
     NotFound:
       description: Resource not found
       content:
@@ -174,6 +419,18 @@ components:
             $ref: '#/components/schemas/ApiError'
     Conflict:
       description: Resource state conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    TooManyRequests:
+      description: Too many authentication requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    ServiceUnavailable:
+      description: Authentication provider is temporarily unavailable
       content:
         application/json:
           schema:
@@ -295,6 +552,115 @@ components:
         expiresAt:
           type: string
           format: date-time
+
+    SignUpRequest:
+      type: object
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    ConfirmSignUpRequest:
+      type: object
+      required:
+        - email
+        - confirmationCode
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        confirmationCode:
+          type: string
+
+    EmailRequest:
+      type: object
+      required:
+        - email
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      additionalProperties: false
+      properties:
+        refreshToken:
+          type: string
+
+    ConfirmForgotPasswordRequest:
+      type: object
+      required:
+        - email
+        - confirmationCode
+        - newPassword
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        confirmationCode:
+          type: string
+        newPassword:
+          type: string
+
+    AuthTokens:
+      type: object
+      required:
+        - accessToken
+        - idToken
+        - refreshToken
+        - tokenType
+        - expiresIn
+      properties:
+        accessToken:
+          type: string
+        idToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+        expiresIn:
+          type: integer
+          format: int32
+
+    CurrentUser:
+      type: object
+      required:
+        - userId
+        - emailVerified
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        emailVerified:
+          type: boolean
 
     ApiError:
       type: object

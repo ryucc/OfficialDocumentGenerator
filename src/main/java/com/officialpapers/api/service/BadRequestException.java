@@ -1,8 +1,8 @@
 package com.officialpapers.api.service;
 
-public class BadRequestException extends RuntimeException {
+public class BadRequestException extends ApiException {
 
     public BadRequestException(String message) {
-        super(message);
+        super(400, "BAD_REQUEST", message);
     }
 }

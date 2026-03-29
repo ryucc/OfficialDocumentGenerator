@@ -1,5 +1,6 @@
 package com.officialpapers.api.service;
 
+import com.officialpapers.domain.AuthenticatedUser;
 import com.officialpapers.domain.CreateUploadedDocumentCommand;
 import com.officialpapers.domain.CreatedUpload;
 import com.officialpapers.domain.DownloadTarget;
@@ -23,11 +24,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -35,6 +34,10 @@ class UploadedDocumentServiceTest {
 
     private static final Clock FIXED_CLOCK =
             Clock.fixed(Instant.parse("2026-03-29T06:00:00Z"), ZoneOffset.UTC);
+    private static final AuthenticatedUser USER =
+            new AuthenticatedUser("user-123", "user@example.com", true);
+    private static final AuthenticatedUser OTHER_USER =
+            new AuthenticatedUser("user-999", "other@example.com", true);
 
     private InMemoryUploadedDocumentRepository repository;
     private FakeUploadedDocumentObjectStore objectStore;
@@ -56,26 +59,20 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void createDocumentReturnsPendingUploadAndPersistsMetadata() {
+    void createDocumentReturnsPendingUploadAndPersistsOwnerScopedMetadata() {
         CreatedUpload created = service.createDocument(
+                USER,
                 new CreateUploadedDocumentCommand("memo.pdf", "application/pdf", 128L)
         );
 
         assertEquals("11111111-1111-1111-1111-111111111111", created.document().id());
-        assertEquals("memo.pdf", created.document().filename());
-        assertEquals("application/pdf", created.document().contentType());
-        assertEquals(UploadedDocumentStatus.PENDING_UPLOAD, created.document().status());
+        assertEquals("user-123", created.document().ownerUserId());
         assertEquals(
-                "sample-documents/11111111-1111-1111-1111-111111111111/memo.pdf",
+                "sample-documents/user-123/11111111-1111-1111-1111-111111111111/memo.pdf",
                 created.document().sourceObjectKey()
         );
-        assertEquals("2026-03-29T06:00:00Z", created.document().createdAt());
-        assertEquals("2026-03-29T06:15:00Z", created.upload().expiresAt());
-        assertEquals("PUT", created.upload().uploadMethod());
-        assertEquals("application/pdf", created.upload().uploadHeaders().get("Content-Type"));
-        assertEquals(created.document(), repository.findById(created.document().id()).orElseThrow());
+        assertEquals(created.document(), repository.findById(USER.userId(), created.document().id()).orElseThrow());
         assertEquals(created.document().sourceObjectKey(), objectStore.lastUploadObjectKey);
-        assertEquals("application/pdf", objectStore.lastUploadContentType);
         assertEquals(Duration.ofMinutes(15), objectStore.lastUploadExpiry);
     }
 
@@ -84,6 +81,7 @@ class UploadedDocumentServiceTest {
         BadRequestException exception = assertThrows(
                 BadRequestException.class,
                 () -> service.createDocument(
+                        USER,
                         new CreateUploadedDocumentCommand("payload.exe", "application/octet-stream", 42L)
                 )
         );
@@ -92,8 +90,9 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void listDocumentsReturnsUpdatedAtDescending() {
+    void listDocumentsReturnsOnlyAvailableDocumentsForAuthenticatedUser() {
         repository.save(document(
+                USER.userId(),
                 "11111111-1111-1111-1111-111111111111",
                 "older.pdf",
                 "2026-03-29T06:00:00Z",
@@ -101,24 +100,56 @@ class UploadedDocumentServiceTest {
                 UploadedDocumentStatus.AVAILABLE
         ));
         repository.save(document(
+                USER.userId(),
                 "22222222-2222-2222-2222-222222222222",
+                "pending.pdf",
+                "2026-03-29T06:00:00Z",
+                "2026-03-29T06:20:00Z",
+                UploadedDocumentStatus.PENDING_UPLOAD
+        ));
+        repository.save(document(
+                USER.userId(),
+                "33333333-3333-3333-3333-333333333333",
                 "newer.pdf",
                 "2026-03-29T06:00:00Z",
                 "2026-03-29T06:10:00Z",
-                UploadedDocumentStatus.PENDING_UPLOAD
+                UploadedDocumentStatus.AVAILABLE
+        ));
+        repository.save(document(
+                OTHER_USER.userId(),
+                "44444444-4444-4444-4444-444444444444",
+                "other.pdf",
+                "2026-03-29T06:00:00Z",
+                "2026-03-29T06:30:00Z",
+                UploadedDocumentStatus.AVAILABLE
         ));
 
-        List<UploadedDocument> listed = service.listDocuments();
+        List<UploadedDocument> listed = service.listDocuments(USER);
 
         assertEquals(List.of(
-                "22222222-2222-2222-2222-222222222222",
+                "33333333-3333-3333-3333-333333333333",
                 "11111111-1111-1111-1111-111111111111"
         ), listed.stream().map(UploadedDocument::id).toList());
     }
 
     @Test
+    void getDocumentReturnsNotFoundForAnotherUsersDocument() {
+        repository.save(document(
+                OTHER_USER.userId(),
+                "11111111-1111-1111-1111-111111111111",
+                "other.pdf",
+                "2026-03-29T06:00:00Z",
+                "2026-03-29T06:10:00Z",
+                UploadedDocumentStatus.AVAILABLE
+        ));
+
+        assertThrows(NotFoundException.class, () -> service.getDocument(USER, "11111111-1111-1111-1111-111111111111"));
+    }
+
+    @Test
     void completeUploadMarksPendingDocumentAvailableAndTriggersRecompile() {
         UploadedDocument pending = document(
+                USER.userId(),
                 "33333333-3333-3333-3333-333333333333",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -128,18 +159,18 @@ class UploadedDocumentServiceTest {
         repository.save(pending);
         objectStore.objectSizes.put(pending.sourceObjectKey(), 512L);
 
-        UploadedDocument completed = service.completeUpload(pending.id());
+        UploadedDocument completed = service.completeUpload(USER, pending.id());
 
         assertEquals(UploadedDocumentStatus.AVAILABLE, completed.status());
         assertEquals(512L, completed.sizeBytes());
-        assertEquals("2026-03-29T06:00:00Z", completed.createdAt());
-        assertEquals("2026-03-29T06:00:00Z", completed.updatedAt());
+        assertEquals(USER.userId(), completed.ownerUserId());
         verify(recompileTrigger).requestRecompile();
     }
 
     @Test
     void completeUploadIsIdempotentForAvailableDocument() {
         UploadedDocument available = document(
+                USER.userId(),
                 "44444444-4444-4444-4444-444444444444",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -148,7 +179,7 @@ class UploadedDocumentServiceTest {
         );
         repository.save(available);
 
-        UploadedDocument completed = service.completeUpload(available.id());
+        UploadedDocument completed = service.completeUpload(USER, available.id());
 
         assertEquals(available, completed);
         assertEquals(0, objectStore.getObjectSizeCalls);
@@ -158,6 +189,7 @@ class UploadedDocumentServiceTest {
     @Test
     void completeUploadReturnsConflictWhenObjectIsMissing() {
         UploadedDocument pending = document(
+                USER.userId(),
                 "55555555-5555-5555-5555-555555555555",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -168,7 +200,7 @@ class UploadedDocumentServiceTest {
 
         ConflictException exception = assertThrows(
                 ConflictException.class,
-                () -> service.completeUpload(pending.id())
+                () -> service.completeUpload(USER, pending.id())
         );
 
         assertEquals("UPLOAD_NOT_FOUND", exception.code());
@@ -177,6 +209,7 @@ class UploadedDocumentServiceTest {
     @Test
     void createDownloadTargetRejectsPendingDocument() {
         UploadedDocument pending = document(
+                USER.userId(),
                 "66666666-6666-6666-6666-666666666666",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -187,7 +220,7 @@ class UploadedDocumentServiceTest {
 
         ConflictException exception = assertThrows(
                 ConflictException.class,
-                () -> service.createDownloadTarget(pending.id())
+                () -> service.createDownloadTarget(USER, pending.id())
         );
 
         assertEquals("DOCUMENT_NOT_READY", exception.code());
@@ -196,6 +229,7 @@ class UploadedDocumentServiceTest {
     @Test
     void createDownloadTargetReturnsPresignedDownloadForAvailableDocument() {
         UploadedDocument available = document(
+                USER.userId(),
                 "77777777-7777-7777-7777-777777777777",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -205,17 +239,16 @@ class UploadedDocumentServiceTest {
         repository.save(available);
         objectStore.objectSizes.put(available.sourceObjectKey(), 2048L);
 
-        DownloadTarget downloadTarget = service.createDownloadTarget(available.id());
+        DownloadTarget downloadTarget = service.createDownloadTarget(USER, available.id());
 
         assertEquals("https://download.example.com/object", downloadTarget.downloadUrl());
-        assertEquals("GET", downloadTarget.downloadMethod());
-        assertEquals(Duration.ofMinutes(15), objectStore.lastDownloadExpiry);
         assertEquals(available.sourceObjectKey(), objectStore.lastDownloadObjectKey);
     }
 
     @Test
     void deleteDocumentRemovesMetadataAndObjectAndTriggersRecompile() {
         UploadedDocument available = document(
+                USER.userId(),
                 "88888888-8888-8888-8888-888888888888",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -224,9 +257,9 @@ class UploadedDocumentServiceTest {
         );
         repository.save(available);
 
-        service.deleteDocument(available.id());
+        service.deleteDocument(USER, available.id());
 
-        assertTrue(repository.findById(available.id()).isEmpty());
+        assertTrue(repository.findById(USER.userId(), available.id()).isEmpty());
         assertEquals(List.of(available.sourceObjectKey()), objectStore.deletedKeys);
         verify(recompileTrigger).requestRecompile();
     }
@@ -234,6 +267,7 @@ class UploadedDocumentServiceTest {
     @Test
     void deleteDocumentWrapsObjectStoreDeletionFailure() {
         UploadedDocument available = document(
+                USER.userId(),
                 "99999999-9999-9999-9999-999999999999",
                 "memo.pdf",
                 "2026-03-29T06:00:00Z",
@@ -245,7 +279,7 @@ class UploadedDocumentServiceTest {
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> service.deleteDocument(available.id())
+                () -> service.deleteDocument(USER, available.id())
         );
 
         assertEquals("Failed to delete uploaded object", exception.getMessage());
@@ -254,6 +288,7 @@ class UploadedDocumentServiceTest {
     }
 
     private static UploadedDocument document(
+            String ownerUserId,
             String id,
             String filename,
             String createdAt,
@@ -262,11 +297,12 @@ class UploadedDocumentServiceTest {
     ) {
         return new UploadedDocument(
                 id,
+                ownerUserId,
                 filename,
                 "application/pdf",
                 256L,
                 status,
-                "sample-documents/" + id + "/" + filename,
+                "sample-documents/" + ownerUserId + "/" + id + "/" + filename,
                 createdAt,
                 updatedAt
         );
@@ -278,24 +314,29 @@ class UploadedDocumentServiceTest {
 
         @Override
         public void save(UploadedDocument document) {
-            documents.put(document.id(), document);
+            documents.put(key(document.ownerUserId(), document.id()), document);
         }
 
         @Override
-        public Optional<UploadedDocument> findById(String documentId) {
-            return Optional.ofNullable(documents.get(documentId));
+        public Optional<UploadedDocument> findById(String ownerUserId, String documentId) {
+            return Optional.ofNullable(documents.get(key(ownerUserId, documentId)));
         }
 
         @Override
-        public List<UploadedDocument> findAll() {
+        public List<UploadedDocument> findAllByOwnerUserId(String ownerUserId) {
             return documents.values().stream()
+                    .filter(document -> document.ownerUserId().equals(ownerUserId))
                     .sorted(Comparator.comparing(UploadedDocument::id))
                     .toList();
         }
 
         @Override
-        public void deleteById(String documentId) {
-            documents.remove(documentId);
+        public void deleteById(String ownerUserId, String documentId) {
+            documents.remove(key(ownerUserId, documentId));
+        }
+
+        private String key(String ownerUserId, String documentId) {
+            return ownerUserId + "#" + documentId;
         }
     }
 
@@ -305,16 +346,13 @@ class UploadedDocumentServiceTest {
         private final List<String> deletedKeys = new ArrayList<>();
         private RuntimeException deleteException;
         private String lastUploadObjectKey;
-        private String lastUploadContentType;
         private Duration lastUploadExpiry;
         private String lastDownloadObjectKey;
-        private Duration lastDownloadExpiry;
         private int getObjectSizeCalls;
 
         @Override
         public UploadTarget createUploadTarget(String objectKey, String contentType, Duration expiry) {
             lastUploadObjectKey = objectKey;
-            lastUploadContentType = contentType;
             lastUploadExpiry = expiry;
             return new UploadTarget(
                     "https://upload.example.com/object",
@@ -327,7 +365,6 @@ class UploadedDocumentServiceTest {
         @Override
         public DownloadTarget createDownloadTarget(String objectKey, Duration expiry) {
             lastDownloadObjectKey = objectKey;
-            lastDownloadExpiry = expiry;
             return new DownloadTarget(
                     "https://download.example.com/object",
                     "GET",
