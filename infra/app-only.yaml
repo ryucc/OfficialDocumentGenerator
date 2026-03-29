@@ -199,7 +199,6 @@ Resources:
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub sample-documents-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: ownerUserId
@@ -326,7 +325,6 @@ Resources:
   ProjectsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub email-projects-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: projectId
@@ -534,7 +532,6 @@ Resources:
   EmailVerificationRecord:
     Type: AWS::Route53::RecordSet
     Condition: HasHostedZone
-    DependsOn: SESSetup
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Sub _amazonses.${EmailDomainName}
