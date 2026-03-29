@@ -12,7 +12,10 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -23,6 +26,7 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -117,6 +121,43 @@ class S3UploadedDocumentObjectStoreTest {
         Optional<Long> size = store.getObjectSize("sample-documents/id/memo.pdf");
 
         assertTrue(size.isEmpty());
+    }
+
+    @Test
+    void findObjectByPrefixReturnsStoredObjectDetailsWhenExactlyOneMatchExists() {
+        when(s3Client.listObjectsV2(org.mockito.ArgumentMatchers.any(ListObjectsV2Request.class))).thenReturn(
+                ListObjectsV2Response.builder()
+                        .contents(List.of(S3Object.builder().key("sample-documents/id/memo.pdf").build()))
+                        .build()
+        );
+        when(s3Client.headObject(org.mockito.ArgumentMatchers.any(HeadObjectRequest.class))).thenReturn(
+                HeadObjectResponse.builder()
+                        .contentLength(2048L)
+                        .contentType("application/pdf")
+                        .build()
+        );
+
+        Optional<com.officialpapers.domain.StoredUploadedObject> object =
+                store.findObjectByPrefix("sample-documents/id/");
+
+        ArgumentCaptor<ListObjectsV2Request> captor = ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        verify(s3Client).listObjectsV2(captor.capture());
+        assertEquals("uploaded-documents-test", captor.getValue().bucket());
+        assertEquals("sample-documents/id/", captor.getValue().prefix());
+        assertEquals(Optional.of("sample-documents/id/memo.pdf"), object.map(com.officialpapers.domain.StoredUploadedObject::objectKey));
+        assertEquals(Optional.of(2048L), object.map(com.officialpapers.domain.StoredUploadedObject::sizeBytes));
+    }
+
+    @Test
+    void findObjectByPrefixReturnsEmptyWhenNoMatchExists() {
+        when(s3Client.listObjectsV2(org.mockito.ArgumentMatchers.any(ListObjectsV2Request.class))).thenReturn(
+                ListObjectsV2Response.builder().contents(List.of()).build()
+        );
+
+        Optional<com.officialpapers.domain.StoredUploadedObject> object =
+                store.findObjectByPrefix("sample-documents/id/");
+
+        assertTrue(object.isEmpty());
     }
 
     @Test
