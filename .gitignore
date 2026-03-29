@@ -31,3 +31,6 @@ dist/
 # Application
 application-local.properties
 application-local.yaml
+
+# AWS SAM
+.aws-sam/
