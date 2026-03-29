@@ -1,6 +1,6 @@
-# Official Document Delivery Framework
+# Official Document Generator
 
-A Spring Boot API for email-linked event handling, instruction management, chat-driven document drafting, and document export.
+A Spring Boot API for managing document-writing instructions.
 
 ## Technology Stack
 
@@ -75,28 +75,12 @@ Access the H2 database console at:
 
 ## API Endpoints
 
-### Inbound Email
-- `POST /api/v1/inbound/emails` - Ingest a forwarded email
-
-### Email Events
-- `GET /api/v1/email-events` - List email events
-- `GET /api/v1/email-events/{emailEventId}` - Get an email event
-
 ### Document Instructions
 - `GET /api/v1/document-instructions` - List document-writing instructions
 - `POST /api/v1/document-instructions` - Create a document-writing instruction
 - `GET /api/v1/document-instructions/{instructionId}` - Get a document-writing instruction
 - `PUT /api/v1/document-instructions/{instructionId}` - Update a document-writing instruction
 - `DELETE /api/v1/document-instructions/{instructionId}` - Delete a document-writing instruction
-
-### Chat
-- `GET /api/v1/email-events/{emailEventId}/chat-history` - Get chat history for an email event
-- `POST /api/v1/email-events/{emailEventId}/messages` - Send a chat message within an email event
-
-### Documents
-- `POST /api/v1/email-events/{emailEventId}/export` - Export a document for an email event
-- `GET /api/v1/documents/{documentId}` - Get document metadata
-- `GET /api/v1/documents/{documentId}/download` - Download an exported document
 
 ## Configuration
 
@@ -131,8 +115,7 @@ java -jar target/official-paper-gpt-0.1.0.jar --spring.profiles.active=prod
 ## Development Notes
 
 - The application uses JWT-based authentication (placeholder - needs implementation)
-- Document generation logic is stubbed and needs integration with actual document processing services
-- Chat responses are placeholder implementations - integrate with AI/LLM services as needed
+- Document instruction management provides CRUD operations for storing and retrieving document templates
 
 ## License
 
