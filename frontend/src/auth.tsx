@@ -31,6 +31,7 @@ export type LoginOutcome =
   | { type: 'challenge', challenge: AuthChallenge }
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
+type SessionTokenKind = 'accessToken' | 'idToken'
 
 interface AuthContextValue {
   status: AuthStatus
@@ -278,18 +279,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return refreshPromiseRef.current
   }
 
-  const authFetch = async (path: string, init: RequestInit = {}) => {
+  const authorizedFetch = async (
+    path: string,
+    init: RequestInit = {},
+    tokenKind: SessionTokenKind,
+  ) => {
     const currentTokens = tokensRef.current
-    if (!currentTokens?.accessToken) {
+    const currentToken = currentTokens?.[tokenKind]
+    if (!currentToken) {
       throw new ApiError(401, 'UNAUTHORIZED', '請先登入')
     }
 
-    const makeRequest = async (accessToken: string) => {
+    const makeRequest = async (bearerToken: string) => {
       try {
         return await fetch(buildApiUrl(path), {
           ...init,
           headers: mergeHeaders(init.headers, {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${bearerToken}`,
           }),
         })
       } catch (error) {
@@ -297,19 +303,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    let response = await makeRequest(currentTokens.accessToken)
+    let response = await makeRequest(currentToken)
     if (response.status !== 401) {
       return response
     }
 
     const refreshedTokens = await refreshSession()
-    if (!refreshedTokens?.accessToken) {
+    const refreshedToken = refreshedTokens?.[tokenKind]
+    if (!refreshedToken) {
       return response
     }
 
-    response = await makeRequest(refreshedTokens.accessToken)
+    response = await makeRequest(refreshedToken)
     return response
   }
+
+  const authFetch = async (path: string, init: RequestInit = {}) => (
+    authorizedFetch(path, init, 'idToken')
+  )
 
   const refreshUser = async () => {
     if (!tokensRef.current) {
@@ -321,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('loading')
 
     try {
-      const response = await authFetch('/auth/me')
+      const response = await authorizedFetch('/auth/me', {}, 'accessToken')
       if (!response.ok) {
         throw await createApiError(response, '載入目前使用者失敗')
       }
@@ -419,16 +430,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (currentTokens) {
       try {
-        await fetch(buildApiUrl('/auth/logout'), {
+        await authorizedFetch('/auth/logout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${currentTokens.accessToken}`,
           },
           body: JSON.stringify({
             refreshToken: currentTokens.refreshToken,
           }),
-        })
+        }, 'accessToken')
       } catch {
         // Local sign-out must still succeed if the backend request fails.
       }
