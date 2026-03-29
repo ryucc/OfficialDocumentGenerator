@@ -460,7 +460,6 @@ Resources:
   EmailVerificationRecord:
     Type: AWS::Route53::RecordSet
     Condition: HasHostedZone
-    DependsOn: SESSetup
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Sub _amazonses.${EmailDomainName}
