@@ -8,13 +8,19 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.nio.charset.StandardCharsets;
+import javax.inject.Inject;
+import javax.inject.Named;
 
 public class S3InstructionContentStore implements InstructionContentStore {
 
     private final S3Client s3Client;
     private final String bucketName;
 
-    public S3InstructionContentStore(S3Client s3Client, String bucketName) {
+    @Inject
+    public S3InstructionContentStore(
+            S3Client s3Client,
+            @Named("instructionContentBucket") String bucketName
+    ) {
         this.s3Client = s3Client;
         this.bucketName = bucketName;
     }

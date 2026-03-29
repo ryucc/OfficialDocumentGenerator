@@ -13,6 +13,8 @@ import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.inject.Inject;
+import javax.inject.Named;
 
 public class DynamoDbInstructionMetadataRepository implements InstructionMetadataRepository {
 
@@ -25,7 +27,11 @@ public class DynamoDbInstructionMetadataRepository implements InstructionMetadat
     private final DynamoDbClient dynamoDbClient;
     private final String tableName;
 
-    public DynamoDbInstructionMetadataRepository(DynamoDbClient dynamoDbClient, String tableName) {
+    @Inject
+    public DynamoDbInstructionMetadataRepository(
+            DynamoDbClient dynamoDbClient,
+            @Named("instructionMetadataTable") String tableName
+    ) {
         this.dynamoDbClient = dynamoDbClient;
         this.tableName = tableName;
     }

@@ -7,36 +7,41 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.officialpapers.api.di.DaggerLambdaComponent;
+import com.officialpapers.api.di.LambdaComponent;
 import com.officialpapers.api.model.ApiError;
 import com.officialpapers.api.model.DocumentInstructionCreateRequest;
 import com.officialpapers.api.model.DocumentInstructionListResponse;
 import com.officialpapers.api.model.DocumentInstructionUpdateRequest;
-import com.officialpapers.api.persistence.DynamoDbInstructionMetadataRepository;
-import com.officialpapers.api.persistence.S3InstructionContentStore;
 import com.officialpapers.api.service.BadRequestException;
 import com.officialpapers.api.service.DocumentInstructionService;
 import com.officialpapers.api.service.NotFoundException;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.s3.S3Client;
 
-import java.time.Clock;
+import javax.inject.Inject;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public class DocumentInstructionHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
+    private static final LambdaComponent COMPONENT = DaggerLambdaComponent.create();
+
     private final DocumentInstructionService instructionService;
     private final ObjectMapper objectMapper;
 
     public DocumentInstructionHandler() {
-        this(buildDefaultService(), defaultObjectMapper());
+        this(COMPONENT.handler());
+    }
+
+    private DocumentInstructionHandler(DocumentInstructionHandler delegate) {
+        this(delegate.instructionService, delegate.objectMapper);
     }
 
     public DocumentInstructionHandler(DocumentInstructionService instructionService) {
-        this(instructionService, defaultObjectMapper());
+        this(instructionService, new ObjectMapper());
     }
 
+    @Inject
     public DocumentInstructionHandler(DocumentInstructionService instructionService, ObjectMapper objectMapper) {
         this.instructionService = instructionService;
         this.objectMapper = objectMapper;
@@ -158,29 +163,4 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
         return resp;
     }
 
-    private static ObjectMapper defaultObjectMapper() {
-        return new ObjectMapper();
-    }
-
-    private static DocumentInstructionService buildDefaultService() {
-        return new DocumentInstructionService(
-                new DynamoDbInstructionMetadataRepository(
-                        DynamoDbClient.create(),
-                        requireEnvironmentVariable("INSTRUCTION_METADATA_TABLE")
-                ),
-                new S3InstructionContentStore(
-                        S3Client.create(),
-                        requireEnvironmentVariable("INSTRUCTION_CONTENT_BUCKET")
-                ),
-                Clock.systemUTC()
-        );
-    }
-
-    private static String requireEnvironmentVariable(String key) {
-        String value = System.getenv(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("Missing required environment variable: " + key);
-        }
-        return value;
-    }
 }

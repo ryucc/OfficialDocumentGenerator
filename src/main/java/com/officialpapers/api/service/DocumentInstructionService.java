@@ -11,7 +11,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
+@Singleton
 public class DocumentInstructionService {
 
     private static final Comparator<DocumentInstructionMetadata> UPDATED_AT_DESC =
@@ -34,6 +37,7 @@ public class DocumentInstructionService {
         this.idSupplier = idSupplier;
     }
 
+    @Inject
     public DocumentInstructionService(
             InstructionMetadataRepository metadataRepository,
             InstructionContentStore contentStore,
