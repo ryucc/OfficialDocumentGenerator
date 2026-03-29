@@ -27,7 +27,11 @@ Thumbs.db
 # Node
 node_modules/
 dist/
+.vite/
 
 # Application
 application-local.properties
 application-local.yaml
+
+# AWS SAM
+.aws-sam/
