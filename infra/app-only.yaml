@@ -9,7 +9,7 @@ Parameters:
     AllowedValues: [test]
   AllowedEmailSenders:
     Type: CommaDelimitedList
-    Default: ""
+    Default: "shortyliu@gmail.com"
     Description: Comma-separated list of allowed sender email addresses for ai@gongwengpt.click (leave empty to allow all)
   DomainName:
     Type: String
