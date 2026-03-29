@@ -115,20 +115,33 @@ java -jar build/libs/official-paper-gpt-0.1.0.jar --spring.profiles.active=prod
 
 ## Official Document Export
 
-The JSON-to-DOCX exporter only needs:
+The exporters need:
 - a filled JSON file passed through `-PinputJson`
 - the built-in DOCX template at `src/main/resources/templates/important-person-invitation-template.docx`
 
-Example:
+DOCX example:
 
 ```bash
-./gradlew exportOfficialDocument -PinputJson=/absolute/or/relative/path/to/document.json
+./gradlew exportOfficialDocumentDocx -PinputJson=/absolute/or/relative/path/to/document.json
 ```
 
-Optional output directory:
+PDF example:
 
 ```bash
-./gradlew exportOfficialDocument -PinputJson=/path/to/document.json -PoutputDir=/path/to/output-dir
+./gradlew exportOfficialDocumentPdf -PinputJson=/path/to/document.json
+```
+
+Optional output directory for either format:
+
+```bash
+./gradlew exportOfficialDocumentDocx -PinputJson=/path/to/document.json -PoutputDir=/path/to/output-dir
+./gradlew exportOfficialDocumentPdf -PinputJson=/path/to/document.json -PoutputDir=/path/to/output-dir
+```
+
+PDF export requires LibreOffice headless conversion. By default the exporter runs `soffice` from `PATH`. Override it when needed:
+
+```bash
+./gradlew exportOfficialDocumentPdf -PinputJson=/path/to/document.json -PsofficePath=/path/to/soffice
 ```
 
 If `-PoutputDir` is omitted, the exporter writes to `build/official-documents`.
