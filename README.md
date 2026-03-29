@@ -9,7 +9,7 @@ A Spring Boot API for managing document-writing instructions.
 - **Spring Data JPA**
 - **H2 Database** (development)
 - **PostgreSQL** (production)
-- **Maven**
+- **Gradle**
 - **SpringDoc OpenAPI** (API documentation)
 - **Lombok**
 
@@ -23,18 +23,12 @@ OpenAPI specification is located at `src/main/resources/openapi/openapi.yaml`
 src/
 ├── main/
 │   ├── java/com/officialpapers/api/
-│   │   ├── config/          # Configuration classes
-│   │   ├── controller/      # REST controllers
-│   │   ├── dto/             # Data Transfer Objects
-│   │   ├── entity/          # JPA entities
-│   │   ├── enums/           # Enumerations
-│   │   ├── mapper/          # Entity-DTO mappers
-│   │   ├── repository/      # Spring Data repositories
-│   │   ├── service/         # Business logic services
+│   │   ├── controller/      # REST controllers (stub implementation)
 │   │   └── OfficialPaperGptApplication.java
 │   └── resources/
-│       ├── application.properties
-│       └── application-prod.properties
+│       ├── application.yaml # Application configuration
+│       └── openapi/
+│           └── openapi.yaml # API specification
 └── test/
     └── java/com/officialpapers/api/
 ```
@@ -44,7 +38,6 @@ src/
 ### Prerequisites
 
 - Java 17 or higher
-- Maven 3.6+
 
 ### Running the Application
 
@@ -52,12 +45,12 @@ src/
 
 2. **Build the project**
    ```bash
-   mvn clean install
+   ./gradlew build
    ```
 
 3. **Run the application**
    ```bash
-   mvn spring-boot:run
+   ./gradlew bootRun
    ```
 
 The application will start on `http://localhost:8080`
@@ -95,7 +88,7 @@ Uses H2 in-memory database.
 ### Production Profile
 Uses PostgreSQL database. Run with:
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=prod
+./gradlew bootRun --args='--spring.profiles.active=prod'
 ```
 
 ### Environment Variables (Production)
@@ -107,12 +100,12 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 
 Create an executable JAR:
 ```bash
-mvn clean package
+./gradlew bootJar
 ```
 
 Run the JAR:
 ```bash
-java -jar target/official-paper-gpt-0.1.0.jar --spring.profiles.active=prod
+java -jar build/libs/official-paper-gpt-0.1.0.jar --spring.profiles.active=prod
 ```
 
 ## Development Notes
