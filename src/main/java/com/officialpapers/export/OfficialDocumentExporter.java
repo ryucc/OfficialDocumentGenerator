@@ -10,15 +10,32 @@ import java.util.List;
 public class OfficialDocumentExporter {
 
     private final ObjectMapper objectMapper;
-    private final OfficialDocumentDocxGenerator docxGenerator;
+    private final OfficialDocumentGenerator docxGenerator;
+    private final OfficialDocumentGenerator pdfGenerator;
 
     public OfficialDocumentExporter() {
-        this(new ObjectMapper(), new OfficialDocumentDocxGenerator(OfficialDocumentGeneratorConfig.defaultConfig()));
+        this(new ObjectMapper(), OfficialDocumentGeneratorConfig.defaultConfig());
     }
 
-    OfficialDocumentExporter(ObjectMapper objectMapper, OfficialDocumentDocxGenerator docxGenerator) {
+    private OfficialDocumentExporter(ObjectMapper objectMapper, OfficialDocumentGeneratorConfig config) {
+        this(
+                objectMapper,
+                new OfficialDocumentDocxGenerator(config),
+                new OfficialDocumentPdfGenerator(
+                        new OfficialDocumentDocxGenerator(config),
+                        new LibreOfficeDocxToPdfConverter()
+                )
+        );
+    }
+
+    OfficialDocumentExporter(
+            ObjectMapper objectMapper,
+            OfficialDocumentGenerator docxGenerator,
+            OfficialDocumentGenerator pdfGenerator
+    ) {
         this.objectMapper = objectMapper;
         this.docxGenerator = docxGenerator;
+        this.pdfGenerator = pdfGenerator;
     }
 
     OfficialDocumentData load(Path inputJson) throws IOException {
@@ -29,15 +46,12 @@ public class OfficialDocumentExporter {
         }
     }
 
-    public Path export(Path inputJson, Path outputDirectory) throws IOException {
-        OfficialDocumentData data = load(inputJson);
-        Files.createDirectories(outputDirectory);
+    public Path exportDocx(Path inputJson, Path outputDirectory) throws IOException {
+        return export(inputJson, outputDirectory, docxGenerator);
+    }
 
-        GeneratedFile generatedFile = docxGenerator.generate(data);
-        Path outputPath = outputDirectory.resolve(generatedFile.fileName());
-        Files.write(outputPath, generatedFile.bytes());
-
-        return outputPath;
+    public Path exportPdf(Path inputJson, Path outputDirectory) throws IOException {
+        return export(inputJson, outputDirectory, pdfGenerator);
     }
 
     void validate(OfficialDocumentData data) {
@@ -59,6 +73,17 @@ public class OfficialDocumentExporter {
         if (value == null) {
             throw new IllegalArgumentException("Missing required field: " + fieldName);
         }
+    }
+
+    private Path export(Path inputJson, Path outputDirectory, OfficialDocumentGenerator generator) throws IOException {
+        OfficialDocumentData data = load(inputJson);
+        Files.createDirectories(outputDirectory);
+
+        GeneratedFile generatedFile = generator.generate(data);
+        Path outputPath = outputDirectory.resolve(generatedFile.fileName());
+        Files.write(outputPath, generatedFile.bytes());
+
+        return outputPath;
     }
 
     private void requireNonBlank(String value, String fieldName) {

@@ -13,11 +13,13 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.zip.ZipFile;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,8 +46,8 @@ class OfficialDocumentExporterTest {
     }
 
     @Test
-    void exportCreatesDocxMatchingTemplateTableLayout() throws Exception {
-        Path outputFile = exporter.export(sampleJsonPath, tempDir);
+    void exportDocxCreatesDocxMatchingTemplateTableLayout() throws Exception {
+        Path outputFile = exporter.exportDocx(sampleJsonPath, tempDir);
 
         assertEquals("123義大利網紅邀訪案.docx", outputFile.getFileName().toString());
         assertTrue(Files.exists(outputFile));
@@ -76,31 +78,46 @@ class OfficialDocumentExporterTest {
     }
 
     @Test
-    void exportRejectsMissingApplicationFormSection() throws Exception {
+    void exportPdfWritesGeneratedPdfBytesToOutputDirectory() throws Exception {
+        byte[] expectedPdfBytes = "%PDF-test".getBytes(StandardCharsets.UTF_8);
+        OfficialDocumentExporter pdfExporter = new OfficialDocumentExporter(
+                objectMapper,
+                data -> new GeneratedFile(data.outputFileBaseName() + ".docx", new byte[] {1, 2, 3}),
+                data -> new GeneratedFile(data.outputFileBaseName() + ".pdf", expectedPdfBytes)
+        );
+
+        Path outputFile = pdfExporter.exportPdf(sampleJsonPath, tempDir);
+
+        assertEquals("123義大利網紅邀訪案.pdf", outputFile.getFileName().toString());
+        assertArrayEquals(expectedPdfBytes, Files.readAllBytes(outputFile));
+    }
+
+    @Test
+    void exportDocxRejectsMissingApplicationFormSection() throws Exception {
         Path inputJson = writeJson(root -> root.remove("申請表"));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> exporter.export(inputJson, tempDir)
+                () -> exporter.exportDocx(inputJson, tempDir)
         );
 
         assertEquals("Missing required field: 申請表", exception.getMessage());
     }
 
     @Test
-    void exportRejectsBlankOutputFileName() throws Exception {
+    void exportDocxRejectsBlankOutputFileName() throws Exception {
         Path inputJson = writeJson(root -> root.put("輸出檔名", ""));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> exporter.export(inputJson, tempDir)
+                () -> exporter.exportDocx(inputJson, tempDir)
         );
 
         assertEquals("Missing required field: 輸出檔名", exception.getMessage());
     }
 
     @Test
-    void exportRejectsEmptyInviteeAttachment() throws Exception {
+    void exportDocxRejectsEmptyInviteeAttachment() throws Exception {
         Path inputJson = writeJson(root -> {
             ObjectNode attachment = (ObjectNode) root.get("附件一");
             attachment.putArray("名單");
@@ -108,14 +125,14 @@ class OfficialDocumentExporterTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> exporter.export(inputJson, tempDir)
+                () -> exporter.exportDocx(inputJson, tempDir)
         );
 
         assertEquals("Missing required field: 附件一.名單", exception.getMessage());
     }
 
     @Test
-    void exportRejectsNullInviteeAttachment() throws Exception {
+    void exportDocxRejectsNullInviteeAttachment() throws Exception {
         Path inputJson = writeJson(root -> {
             ObjectNode attachment = (ObjectNode) root.get("附件一");
             attachment.putNull("名單");
@@ -123,14 +140,14 @@ class OfficialDocumentExporterTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> exporter.export(inputJson, tempDir)
+                () -> exporter.exportDocx(inputJson, tempDir)
         );
 
         assertEquals("Missing required field: 附件一.名單", exception.getMessage());
     }
 
     @Test
-    void exportRejectsEmptyItineraryAttachment() throws Exception {
+    void exportDocxRejectsEmptyItineraryAttachment() throws Exception {
         Path inputJson = writeJson(root -> {
             ObjectNode attachment = (ObjectNode) root.get("附件二");
             attachment.putArray("行程表");
@@ -138,33 +155,69 @@ class OfficialDocumentExporterTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> exporter.export(inputJson, tempDir)
+                () -> exporter.exportDocx(inputJson, tempDir)
         );
 
         assertEquals("Missing required field: 附件二.行程表", exception.getMessage());
     }
 
     @Test
-    void cliRequiresExplicitInputJsonProperty() {
-        String originalInputJson = System.getProperty("officialDocument.inputJson");
-        String originalOutputDir = System.getProperty("officialDocument.outputDir");
+    void docxCliRequiresExplicitInputJsonProperty() {
+        assertCliRequiresInputJsonProperty(() -> OfficialDocumentDocxExporterCli.main(new String[0]));
+    }
 
-        System.clearProperty("officialDocument.inputJson");
-        System.clearProperty("officialDocument.outputDir");
+    @Test
+    void pdfCliRequiresExplicitInputJsonProperty() {
+        assertCliRequiresInputJsonProperty(() -> OfficialDocumentPdfExporterCli.main(new String[0]));
+    }
+
+    @Test
+    void pdfCliRejectsMissingLibreOfficeCommand() {
+        String originalInputJson = System.getProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY);
+        String originalOutputDir = System.getProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY);
+        String originalSofficePath = System.getProperty(LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY);
+
+        System.setProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY, sampleJsonPath.toString());
+        System.setProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY, tempDir.toString());
+        System.setProperty(
+                LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY,
+                tempDir.resolve("missing-soffice").toString()
+        );
 
         try {
-            IllegalArgumentException exception = assertThrows(
-                    IllegalArgumentException.class,
-                    () -> OfficialDocumentExporterCli.main(new String[0])
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> OfficialDocumentPdfExporterCli.main(new String[0])
             );
+
+            assertTrue(exception.getMessage().contains("LibreOffice CLI not found"));
+        } finally {
+            restoreSystemProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY, originalInputJson);
+            restoreSystemProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY, originalOutputDir);
+            restoreSystemProperty(LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY, originalSofficePath);
+        }
+    }
+
+    private void assertCliRequiresInputJsonProperty(ThrowingRunnable cliInvocation) {
+        String originalInputJson = System.getProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY);
+        String originalOutputDir = System.getProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY);
+        String originalSofficePath = System.getProperty(LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY);
+
+        System.clearProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY);
+        System.clearProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY);
+        System.clearProperty(LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY);
+
+        try {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, cliInvocation::run);
 
             assertEquals(
                     "Missing required system property: officialDocument.inputJson. Pass -PinputJson=/path/to/document.json to Gradle.",
                     exception.getMessage()
             );
         } finally {
-            restoreSystemProperty("officialDocument.inputJson", originalInputJson);
-            restoreSystemProperty("officialDocument.outputDir", originalOutputDir);
+            restoreSystemProperty(OfficialDocumentExportCliSupport.INPUT_JSON_PROPERTY, originalInputJson);
+            restoreSystemProperty(OfficialDocumentExportCliSupport.OUTPUT_DIR_PROPERTY, originalOutputDir);
+            restoreSystemProperty(LibreOfficeDocxToPdfConverter.SOFFICE_PATH_PROPERTY, originalSofficePath);
         }
     }
 
@@ -271,5 +324,10 @@ class OfficialDocumentExporterTest {
     @FunctionalInterface
     private interface JsonMutator {
         void mutate(ObjectNode root);
+    }
+
+    @FunctionalInterface
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }

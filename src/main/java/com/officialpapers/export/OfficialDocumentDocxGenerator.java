@@ -23,7 +23,7 @@ import java.util.List;
  * <p>Manages the full document lifecycle: template loading, data population,
  * serialization, and file generation.
  */
-class OfficialDocumentDocxGenerator {
+class OfficialDocumentDocxGenerator implements OfficialDocumentGenerator {
 
     private final OfficialDocumentGeneratorConfig config;
 
@@ -38,7 +38,8 @@ class OfficialDocumentDocxGenerator {
      * @return a GeneratedFile containing filename and serialized bytes
      * @throws IOException if template loading or serialization fails
      */
-    GeneratedFile generate(OfficialDocumentData data) throws IOException {
+    @Override
+    public GeneratedFile generate(OfficialDocumentData data) throws IOException {
         try (XWPFDocument document = openDocument()) {
             writeDocument(document, data);
             return new GeneratedFile(buildOutputFilename(data), serializeDocument(document));
