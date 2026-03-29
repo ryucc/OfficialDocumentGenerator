@@ -41,6 +41,7 @@ class OpenApiContractTest {
         assertTrue(samTemplate.contains("COGNITO_USER_POOL_CLIENT_ID"));
         assertTrue(samTemplate.contains("cognito-idp:RespondToAuthChallenge"));
         assertTrue(samTemplate.contains("AttributeName: ownerUserId"));
+        assertTrue(samTemplate.contains("- s3:ListBucket"));
 
         assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/login"));
         assertTrue(appOnlyTemplate.contains("Path: /api/v1/auth/respond-to-new-password"));
@@ -53,5 +54,6 @@ class OpenApiContractTest {
         assertTrue(appOnlyTemplate.contains("cognito-idp:RespondToAuthChallenge"));
         assertTrue(appOnlyTemplate.contains("AttributeName: ownerUserId"));
         assertTrue(appOnlyTemplate.contains("- dynamodb:Query"));
+        assertTrue(appOnlyTemplate.contains("- s3:ListBucket"));
     }
 }
