@@ -209,7 +209,7 @@ Resources:
     Properties:
       RuleSetName: !Ref EmailReceiptRuleSet
       Rule:
-        Name: !Sub forward-to-sns-${Stage}
+        Name: !Sub forward-to-s3-${Stage}
         Enabled: true
         Recipients:
           - gongwengpt.click
@@ -220,9 +220,7 @@ Resources:
           - S3Action:
               BucketName: !Ref DocumentBucket
               ObjectKeyPrefix: emails/
-          - SNSAction:
               TopicArn: !Ref IncomingEmailTopic
-              Encoding: UTF-8
 
   # ---- CodePipeline ----
   ArtifactBucket:
