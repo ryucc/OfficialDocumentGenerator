@@ -420,14 +420,6 @@ Resources:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/projects
             Method: GET
-        ProjectsOptions:
-          Type: Api
-          Properties:
-            RestApiId: !Ref DocumentApi
-            Path: /api/v1/projects
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
 
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
