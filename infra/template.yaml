@@ -191,7 +191,6 @@ Resources:
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub sample-documents-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: ownerUserId

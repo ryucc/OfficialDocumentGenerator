@@ -107,7 +107,11 @@ curl http://localhost:3001/api/v1/projects
 
 5. **Check DynamoDB directly**:
    ```bash
-   aws dynamodb scan --table-name email-projects-test --region us-east-1
+   aws dynamodb scan --table-name "$(aws cloudformation describe-stacks \
+     --stack-name official-doc-generator-app-test \
+     --region us-east-1 \
+     --query 'Stacks[0].Outputs[?OutputKey==`ProjectsTableName`].OutputValue' \
+     --output text)" --region us-east-1
    ```
 
 ## Troubleshooting
@@ -142,7 +146,11 @@ npm install
 
 1. **Check if projects exist**:
    ```bash
-   aws dynamodb scan --table-name email-projects-test --region us-east-1
+   aws dynamodb scan --table-name "$(aws cloudformation describe-stacks \
+     --stack-name official-doc-generator-app-test \
+     --region us-east-1 \
+     --query 'Stacks[0].Outputs[?OutputKey==`ProjectsTableName`].OutputValue' \
+     --output text)" --region us-east-1
    ```
 
 2. **Check backend logs** for errors
@@ -153,7 +161,7 @@ npm install
 
 ### Backend
 ```bash
-PROJECTS_TABLE=email-projects-test  # Auto-fetched from CloudFormation
+PROJECTS_TABLE=<value from CloudFormation output ProjectsTableName>
 AWS_REGION=us-east-1
 ```
 
