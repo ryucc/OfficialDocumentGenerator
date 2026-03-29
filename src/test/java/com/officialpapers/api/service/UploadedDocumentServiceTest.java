@@ -23,11 +23,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -56,7 +54,7 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void createDocumentReturnsPendingUploadAndPersistsMetadata() {
+    void createDocumentReturnsPendingUploadWithoutPersistingMetadata() {
         CreatedUpload created = service.createDocument(
                 new CreateUploadedDocumentCommand("memo.pdf", "application/pdf", 128L)
         );
@@ -73,7 +71,7 @@ class UploadedDocumentServiceTest {
         assertEquals("2026-03-29T06:15:00Z", created.upload().expiresAt());
         assertEquals("PUT", created.upload().uploadMethod());
         assertEquals("application/pdf", created.upload().uploadHeaders().get("Content-Type"));
-        assertEquals(created.document(), repository.findById(created.document().id()).orElseThrow());
+        assertTrue(repository.findById(created.document().id()).isEmpty());
         assertEquals(created.document().sourceObjectKey(), objectStore.lastUploadObjectKey);
         assertEquals("application/pdf", objectStore.lastUploadContentType);
         assertEquals(Duration.ofMinutes(15), objectStore.lastUploadExpiry);
@@ -92,7 +90,7 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void listDocumentsReturnsUpdatedAtDescending() {
+    void listDocumentsReturnsOnlyAvailableDocumentsInUpdatedAtDescendingOrder() {
         repository.save(document(
                 "11111111-1111-1111-1111-111111111111",
                 "older.pdf",
@@ -102,18 +100,48 @@ class UploadedDocumentServiceTest {
         ));
         repository.save(document(
                 "22222222-2222-2222-2222-222222222222",
+                "pending.pdf",
+                "2026-03-29T06:00:00Z",
+                "2026-03-29T06:20:00Z",
+                UploadedDocumentStatus.PENDING_UPLOAD
+        ));
+        repository.save(document(
+                "33333333-3333-3333-3333-333333333333",
                 "newer.pdf",
                 "2026-03-29T06:00:00Z",
                 "2026-03-29T06:10:00Z",
-                UploadedDocumentStatus.PENDING_UPLOAD
+                UploadedDocumentStatus.AVAILABLE
         ));
 
         List<UploadedDocument> listed = service.listDocuments();
 
         assertEquals(List.of(
-                "22222222-2222-2222-2222-222222222222",
+                "33333333-3333-3333-3333-333333333333",
                 "11111111-1111-1111-1111-111111111111"
         ), listed.stream().map(UploadedDocument::id).toList());
+    }
+
+    @Test
+    void completeUploadCreatesMetadataOnlyAfterUploadedObjectExists() {
+        objectStore.objectsByPrefix.put(
+                "sample-documents/33333333-3333-3333-3333-333333333333/",
+                new com.officialpapers.domain.StoredUploadedObject(
+                        "sample-documents/33333333-3333-3333-3333-333333333333/memo.pdf",
+                        "application/pdf",
+                        512L
+                )
+        );
+
+        UploadedDocument completed = service.completeUpload("33333333-3333-3333-3333-333333333333");
+
+        assertEquals(UploadedDocumentStatus.AVAILABLE, completed.status());
+        assertEquals("memo.pdf", completed.filename());
+        assertEquals(512L, completed.sizeBytes());
+        assertEquals(
+                completed,
+                repository.findById("33333333-3333-3333-3333-333333333333").orElseThrow()
+        );
+        verify(recompileTrigger).requestRecompile();
     }
 
     @Test
@@ -302,6 +330,7 @@ class UploadedDocumentServiceTest {
     private static final class FakeUploadedDocumentObjectStore implements UploadedDocumentObjectStore {
 
         private final Map<String, Long> objectSizes = new HashMap<>();
+        private final Map<String, com.officialpapers.domain.StoredUploadedObject> objectsByPrefix = new HashMap<>();
         private final List<String> deletedKeys = new ArrayList<>();
         private RuntimeException deleteException;
         private String lastUploadObjectKey;
@@ -339,6 +368,11 @@ class UploadedDocumentServiceTest {
         public Optional<Long> getObjectSize(String objectKey) {
             getObjectSizeCalls++;
             return Optional.ofNullable(objectSizes.get(objectKey));
+        }
+
+        @Override
+        public Optional<com.officialpapers.domain.StoredUploadedObject> findObjectByPrefix(String objectKeyPrefix) {
+            return Optional.ofNullable(objectsByPrefix.get(objectKeyPrefix));
         }
 
         @Override

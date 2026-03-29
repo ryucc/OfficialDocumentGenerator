@@ -2,12 +2,17 @@ package com.officialpapers.api.persistence;
 
 import com.officialpapers.api.service.UploadedDocumentObjectStore;
 import com.officialpapers.domain.DownloadTarget;
+import com.officialpapers.domain.StoredUploadedObject;
 import com.officialpapers.domain.UploadTarget;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -82,6 +87,40 @@ public class S3UploadedDocumentObjectStore implements UploadedDocumentObjectStor
                             .key(objectKey)
                             .build())
                     .contentLength());
+        } catch (S3Exception exception) {
+            if (exception.statusCode() == 404) {
+                return Optional.empty();
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public Optional<StoredUploadedObject> findObjectByPrefix(String objectKeyPrefix) {
+        ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                .bucket(bucketName)
+                .prefix(objectKeyPrefix)
+                .maxKeys(2)
+                .build());
+
+        if (response.contents() == null || response.contents().isEmpty()) {
+            return Optional.empty();
+        }
+        if (response.contents().size() > 1) {
+            throw new IllegalStateException("Expected a single uploaded object for prefix " + objectKeyPrefix);
+        }
+
+        S3Object object = response.contents().get(0);
+        try {
+            HeadObjectResponse head = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(object.key())
+                    .build());
+            return Optional.of(new StoredUploadedObject(
+                    object.key(),
+                    head.contentType(),
+                    head.contentLength()
+            ));
         } catch (S3Exception exception) {
             if (exception.statusCode() == 404) {
                 return Optional.empty();
