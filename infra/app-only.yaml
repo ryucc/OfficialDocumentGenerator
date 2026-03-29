@@ -492,9 +492,12 @@ Resources:
       Environment:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
+          UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref ProjectsTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
         - Statement:
             - Sid: CloudWatchLogsAccess
               Effect: Allow
@@ -515,6 +518,18 @@ Resources:
           Properties:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/projects
+            Method: OPTIONS
+        GetProjectDownloadUrl:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects/{projectId}/download-url
+            Method: GET
+        ProjectDownloadUrlOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects/{projectId}/download-url
             Method: OPTIONS
 
   # SES Receipt Rule Set

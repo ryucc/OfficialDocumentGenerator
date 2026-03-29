@@ -197,10 +197,22 @@
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
+.status-pending {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
 .status-finished {
   background: rgba(52, 211, 153, 0.2);
   color: #34d399;
   border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.status-failed {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .status-unknown {
@@ -239,6 +251,54 @@
   font-size: 0.85rem;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+.project-actions {
+  text-align: center;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.download-btn:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.download-btn:active {
+  transform: translateY(0);
+}
+
+.download-btn svg {
+  flex-shrink: 0;
+}
+
+.no-action {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+
+.email-subject {
+  font-size: 0.9rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+  display: inline-block;
 }
 
 @media (max-width: 768px) {
