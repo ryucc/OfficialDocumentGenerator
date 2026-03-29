@@ -316,6 +316,35 @@ Resources:
             Queue: !GetAtt EmailProcessingQueue.Arn
             BatchSize: 10
 
+  # Lambda function for Projects API
+  ProjectsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub projects-api-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/projects-api
+      Timeout: 30
+      Environment:
+        Variables:
+          PROJECTS_TABLE: !Ref ProjectsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProjectsTable
+      Events:
+        ListProjects:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects
+            Method: GET
+        ProjectsOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects
+            Method: OPTIONS
+
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
     Type: AWS::SES::ReceiptRuleSet

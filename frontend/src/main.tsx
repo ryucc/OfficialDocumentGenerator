@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import './index.css'
 import App from './App.tsx'
 import Documents from './Documents.tsx'
+import Projects from './Projects.tsx'
 
 function Navigation() {
   const location = useLocation()
@@ -22,6 +23,12 @@ function Navigation() {
       >
         範例管理
       </Link>
+      <Link
+        to="/projects"
+        className={`nav-link ${location.pathname === '/projects' ? 'active' : ''}`}
+      >
+        郵件專案
+      </Link>
     </nav>
   )
 }
@@ -33,6 +40,7 @@ function AppRouter() {
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/documents" element={<Documents />} />
+        <Route path="/projects" element={<Projects />} />
       </Routes>
     </>
   )
