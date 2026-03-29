@@ -34,10 +34,10 @@ aws route53 list-hosted-zones --query "HostedZones[?Name=='gongwengpt.click.'].I
 ```bash
 sam deploy \
   --template-file infra/app-only.yaml \
-  --stack-name official-doc-generator-app-test \
-  --parameter-overrides \
+    --stack-name official-doc-generator-app-test \
+    --parameter-overrides \
     Stage=test \
-    AllowedEmailSenders="shortyliu@gmail.com" \
+    AllowedEmailSenders="shortyliu@gmail.com,kurophoenix2000@gmail.com,b213999@gmail.com" \
     DomainName=gongwengpt.click \
     Route53HostedZoneId=<YOUR_HOSTED_ZONE_ID> \
   --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -49,10 +49,10 @@ sam deploy \
 ```bash
 sam deploy \
   --template-file infra/app-only.yaml \
-  --stack-name official-doc-generator-app-test \
-  --parameter-overrides \
+    --stack-name official-doc-generator-app-test \
+    --parameter-overrides \
     Stage=test \
-    AllowedEmailSenders="shortyliu@gmail.com" \
+    AllowedEmailSenders="shortyliu@gmail.com,kurophoenix2000@gmail.com,b213999@gmail.com" \
     DomainName=gongwengpt.click \
   --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
   --resolve-s3
@@ -157,7 +157,7 @@ Custom CloudFormation resource that:
 
 ### Send a Test Email
 
-From an allowed sender (e.g., `shortyliu@gmail.com`), send an email to:
+From an allowed sender (for example `shortyliu@gmail.com`, `kurophoenix2000@gmail.com`, or `b213999@gmail.com`), send an email to:
 ```
 ai@gongwengpt.click
 ```
