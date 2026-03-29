@@ -443,6 +443,8 @@ Resources:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/projects
             Method: GET
+            Auth:
+              Authorizer: NONE
         ProjectsOptions:
           Type: Api
           Properties:
