@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 build/
+gradle.properties
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -22,6 +23,10 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Node
+node_modules/
+dist/
 
 # Application
 application-local.properties

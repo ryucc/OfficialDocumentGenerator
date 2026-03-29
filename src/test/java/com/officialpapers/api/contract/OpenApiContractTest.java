@@ -13,7 +13,7 @@ class OpenApiContractTest {
     @Test
     void openApiServerBasePathMatchesSamRoutes() throws IOException {
         String openApi = Files.readString(Path.of("src/main/resources/openapi/openapi.yaml"));
-        String samTemplate = Files.readString(Path.of("template.yaml"));
+        String samTemplate = Files.readString(Path.of("infra/template.yaml"));
 
         assertTrue(openApi.contains("url: https://api.example.com/api/v1"));
         assertTrue(openApi.contains("url: https://staging-api.example.com/api/v1"));
