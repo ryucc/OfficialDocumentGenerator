@@ -136,10 +136,9 @@ function Projects() {
         <table className="projects-table">
           <thead>
             <tr>
-              <th>專案 ID</th>
-              <th>狀態</th>
-              <th>郵件</th>
+              <th>郵件標題</th>
               <th>生成文件</th>
+              <th>狀態</th>
               <th>建立時間</th>
               <th>更新時間</th>
             </tr>
@@ -147,19 +146,10 @@ function Projects() {
           <tbody>
             {projects.map((project) => (
               <tr key={project.projectId}>
-                <td className="project-id">
-                  <code>{project.projectId.substring(0, 8)}...</code>
-                </td>
-                <td className="project-status">
-                  {getStatusBadge(project.status)}
-                </td>
                 <td className="project-email">
-                  <div className="email-info">
-                    <span className="email-file" title={project.emailS3Key}>
-                      {getEmailFileName(project.emailS3Key)}
-                    </span>
-                    <span className="email-bucket">{project.emailS3Bucket}</span>
-                  </div>
+                  <span className="email-subject" title={project.emailS3Key}>
+                    {getEmailFileName(project.emailS3Key)}
+                  </span>
                 </td>
                 <td className="project-document">
                   {project.generatedDocumentS3Key ? (
@@ -169,6 +159,9 @@ function Projects() {
                   ) : (
                     <span className="no-document">-</span>
                   )}
+                </td>
+                <td className="project-status">
+                  {getStatusBadge(project.status)}
                 </td>
                 <td className="project-date">
                   {formatDate(project.createdAt)}
