@@ -214,8 +214,7 @@ Resources:
 
   UploadedDocumentBucket:
     Type: AWS::S3::Bucket
-    DependsOn:
-      - EmailProcessingQueuePolicy
+    DependsOn: EmailProcessingQueuePolicy
     Properties:
       CorsConfiguration:
         CorsRules:
@@ -379,8 +378,8 @@ Resources:
               - sqs:SendMessage
             Resource: !GetAtt EmailProcessingQueue.Arn
             Condition:
-              ArnEquals:
-                aws:SourceArn: !GetAtt UploadedDocumentBucket.Arn
+              StringLike:
+                aws:SourceArn: !Sub arn:aws:s3:::official-doc-generator-app-*
 
   # Lambda function to process emails and create projects
   EmailProcessorFunction:
@@ -401,12 +400,57 @@ Resources:
             BucketName: !Ref UploadedDocumentBucket
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailProcessingQueue.QueueName
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/email-processor-${Stage}:*
       Events:
         SQSEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt EmailProcessingQueue.Arn
             BatchSize: 10
+
+  # Lambda function for Projects API
+  ProjectsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub projects-api-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/projects-api
+      Timeout: 30
+      Environment:
+        Variables:
+          PROJECTS_TABLE: !Ref ProjectsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProjectsTable
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/projects-api-${Stage}:*
+      Events:
+        ListProjects:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects
+            Method: GET
+        ProjectsOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/projects
+            Method: OPTIONS
 
   # SES Receipt Rule Set
   EmailReceiptRuleSet:

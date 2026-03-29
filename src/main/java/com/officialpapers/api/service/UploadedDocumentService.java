@@ -4,6 +4,7 @@ import com.officialpapers.domain.AuthenticatedUser;
 import com.officialpapers.domain.CreateUploadedDocumentCommand;
 import com.officialpapers.domain.CreatedUpload;
 import com.officialpapers.domain.DownloadTarget;
+import com.officialpapers.domain.StoredUploadedObject;
 import com.officialpapers.domain.UploadTarget;
 import com.officialpapers.domain.UploadedDocument;
 import com.officialpapers.domain.UploadedDocumentStatus;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -88,7 +90,6 @@ public class UploadedDocumentService {
                 timestamp
         );
 
-        repository.save(document);
         UploadTarget uploadTarget = objectStore.createUploadTarget(
                 document.sourceObjectKey(),
                 document.contentType(),
@@ -102,30 +103,54 @@ public class UploadedDocumentService {
     }
 
     public UploadedDocument completeUpload(AuthenticatedUser user, String documentId) {
-        UploadedDocument existing = findDocument(user, documentId);
-        if (existing.status() == UploadedDocumentStatus.AVAILABLE) {
-            return existing;
+        String ownerUserId = requireUserId(user);
+        Optional<UploadedDocument> existing = repository.findById(ownerUserId, documentId);
+        if (existing.isPresent()) {
+            UploadedDocument current = existing.get();
+            if (current.status() == UploadedDocumentStatus.AVAILABLE) {
+                return current;
+            }
+
+            Long objectSize = objectStore.getObjectSize(current.sourceObjectKey())
+                    .orElseThrow(() -> new ConflictException("UPLOAD_NOT_FOUND", "Uploaded object was not found"));
+
+            String timestamp = Instant.now(clock).toString();
+            UploadedDocument updated = new UploadedDocument(
+                    current.id(),
+                    current.ownerUserId(),
+                    current.filename(),
+                    current.contentType(),
+                    objectSize,
+                    UploadedDocumentStatus.AVAILABLE,
+                    current.sourceObjectKey(),
+                    current.createdAt(),
+                    timestamp
+            );
+
+            repository.save(updated);
+            triggerRecompileQuietly();
+            return updated;
         }
 
-        Long objectSize = objectStore.getObjectSize(existing.sourceObjectKey())
+        StoredUploadedObject uploadedObject = objectStore.findObjectByPrefix(buildObjectPrefix(ownerUserId, documentId))
                 .orElseThrow(() -> new ConflictException("UPLOAD_NOT_FOUND", "Uploaded object was not found"));
 
         String timestamp = Instant.now(clock).toString();
-        UploadedDocument updated = new UploadedDocument(
-                existing.id(),
-                existing.ownerUserId(),
-                existing.filename(),
-                existing.contentType(),
-                objectSize,
+        UploadedDocument created = new UploadedDocument(
+                documentId,
+                ownerUserId,
+                filenameFromObjectKey(uploadedObject.objectKey()),
+                normalizeContentType(uploadedObject.contentType()),
+                uploadedObject.sizeBytes(),
                 UploadedDocumentStatus.AVAILABLE,
-                existing.sourceObjectKey(),
-                existing.createdAt(),
+                uploadedObject.objectKey(),
+                timestamp,
                 timestamp
         );
 
-        repository.save(updated);
+        repository.save(created);
         triggerRecompileQuietly();
-        return updated;
+        return created;
     }
 
     public DownloadTarget createDownloadTarget(AuthenticatedUser user, String documentId) {
@@ -184,6 +209,10 @@ public class UploadedDocumentService {
         return "sample-documents/" + ownerUserId + "/" + documentId + "/" + filename;
     }
 
+    private String buildObjectPrefix(String ownerUserId, String documentId) {
+        return "sample-documents/" + ownerUserId + "/" + documentId + "/";
+    }
+
     private String extensionOf(String filename) {
         int extensionIndex = filename.lastIndexOf('.');
         if (extensionIndex <= 0 || extensionIndex == filename.length() - 1) {
@@ -205,5 +234,17 @@ public class UploadedDocumentService {
             throw new UnauthorizedException("UNAUTHORIZED", "Authenticated user is required");
         }
         return user.userId();
+    }
+
+    private String filenameFromObjectKey(String objectKey) {
+        int separatorIndex = objectKey.lastIndexOf('/');
+        return separatorIndex >= 0 ? objectKey.substring(separatorIndex + 1) : objectKey;
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return "application/octet-stream";
+        }
+        return contentType;
     }
 }

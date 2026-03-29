@@ -14,7 +14,7 @@ interface Document {
 }
 
 function Documents() {
-  const { authFetch, user } = useAuth()
+  const { authFetch } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -238,11 +238,7 @@ function Documents() {
       <div className="documents-header">
         <div className="documents-heading">
           <h1>範例管理</h1>
-          <p>
-            目前登入:
-            {' '}
-            <strong>{user?.email || user?.userId}</strong>
-          </p>
+          <p>登入後可管理範例文件，並透過受保護的 API 下載或刪除。</p>
         </div>
         <button
           onClick={handleUploadClick}
@@ -254,13 +250,6 @@ function Documents() {
           </svg>
           {isUploading ? '上傳中...' : '上傳文件'}
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".docx,.pdf"
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
       </div>
 
       {visibleDocuments.length === 0 ? (
@@ -316,6 +305,23 @@ function Documents() {
           </tbody>
         </table>
       )}
+      <button
+        onClick={handleUploadClick}
+        className="upload-btn-float"
+        disabled={isUploading}
+        title={isUploading ? '上傳中...' : '上傳文件'}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".docx,.pdf"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
     </div>
   )
 }

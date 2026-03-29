@@ -80,6 +80,21 @@ tasks.named("compileJava") {
     dependsOn("openApiGenerate")
 }
 
+tasks.register<JavaExec>("exportOfficialDocument") {
+    group = "application"
+    description = "Exports a filled official-document JSON file to DOCX."
+    dependsOn("classes")
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.officialpapers.export.OfficialDocumentExporterCli")
+    project.findProperty("inputJson")?.toString()?.let {
+        systemProperty("officialDocument.inputJson", it)
+    }
+    systemProperty(
+        "officialDocument.outputDir",
+        project.findProperty("outputDir")?.toString() ?: "build/official-documents"
+    )
+}
+
 tasks.register<Zip>("packageLambda") {
     from(tasks.named("compileJava"))
     from(tasks.named("processResources"))

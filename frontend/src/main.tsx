@@ -1,54 +1,64 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
 import AuthPage from './AuthPage.tsx'
 import Documents from './Documents.tsx'
 import DocumentDetail from './DocumentDetail.tsx'
+import Projects from './Projects.tsx'
 import { AuthProvider, useAuth } from './auth.tsx'
 
-function Navigation() {
+function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (theme: 'dark' | 'light') => void }) {
   const location = useLocation()
   const { status, user, logout } = useAuth()
   const isDocumentsRoute = location.pathname.startsWith('/documents')
 
   return (
     <nav className="top-nav">
-      <Link
-        to="/"
-        className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
-      >
-        公文產生器
-      </Link>
-      <Link
-        to="/documents"
-        className={`nav-link ${isDocumentsRoute ? 'active' : ''}`}
-      >
-        範例管理
-      </Link>
-      <div className="nav-spacer" />
-      {status === 'authenticated' && user ? (
-        <>
-          <span className="nav-user">{user.email || user.userId}</span>
-          <button
-            className="nav-action"
-            onClick={() => {
-              void logout()
-            }}
-            type="button"
-          >
-            登出
-          </button>
-        </>
-      ) : (
+      <div className="nav-links">
         <Link
-          to="/auth"
-          className={`nav-link ${location.pathname === '/auth' ? 'active' : ''}`}
+          to="/"
+          className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
         >
-          登入
+          郵件專案
         </Link>
-      )}
+        <Link
+          to="/documents"
+          className={`nav-link ${isDocumentsRoute ? 'active' : ''}`}
+        >
+          範例管理
+        </Link>
+      </div>
+      <div className="nav-actions">
+        {status === 'authenticated' && user ? (
+          <>
+            <span className="nav-user">{user.email || user.userId}</span>
+            <button
+              className="nav-action"
+              onClick={() => {
+                void logout()
+              }}
+              type="button"
+            >
+              登出
+            </button>
+          </>
+        ) : (
+          <Link
+            to="/auth"
+            className={`nav-link ${location.pathname === '/auth' ? 'active' : ''}`}
+          >
+            登入
+          </Link>
+        )}
+        <button
+          className="theme-toggle-nav"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          type="button"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </div>
     </nav>
   )
 }
@@ -79,11 +89,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRouter() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'light'
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
   return (
     <>
-      <Navigation />
+      <Navigation theme={theme} setTheme={setTheme} />
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<Projects />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route
           path="/documents"

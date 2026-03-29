@@ -54,6 +54,37 @@
   cursor: not-allowed;
 }
 
+.upload-btn-float {
+  display: none;
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-color, #646cff);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+  z-index: 50;
+}
+
+.upload-btn-float:hover:not(:disabled) {
+  background: var(--primary-hover, #535bf2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.upload-btn-float:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .loading-state,
 .error-state {
   display: flex;
@@ -314,8 +345,11 @@
   }
 
   .upload-btn {
-    width: 100%;
-    justify-content: center;
+    display: none;
+  }
+
+  .upload-btn-float {
+    display: flex;
   }
 
   .documents-table {

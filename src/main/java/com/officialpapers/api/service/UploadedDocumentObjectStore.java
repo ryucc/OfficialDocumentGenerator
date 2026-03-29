@@ -1,6 +1,7 @@
 package com.officialpapers.api.service;
 
 import com.officialpapers.domain.DownloadTarget;
+import com.officialpapers.domain.StoredUploadedObject;
 import com.officialpapers.domain.UploadTarget;
 
 import java.time.Duration;
@@ -13,6 +14,8 @@ public interface UploadedDocumentObjectStore {
     DownloadTarget createDownloadTarget(String objectKey, Duration expiry);
 
     Optional<Long> getObjectSize(String objectKey);
+
+    Optional<StoredUploadedObject> findObjectByPrefix(String objectKeyPrefix);
 
     void delete(String objectKey);
 }

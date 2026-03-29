@@ -4,6 +4,7 @@ import com.officialpapers.domain.AuthenticatedUser;
 import com.officialpapers.domain.CreateUploadedDocumentCommand;
 import com.officialpapers.domain.CreatedUpload;
 import com.officialpapers.domain.DownloadTarget;
+import com.officialpapers.domain.StoredUploadedObject;
 import com.officialpapers.domain.UploadTarget;
 import com.officialpapers.domain.UploadedDocument;
 import com.officialpapers.domain.UploadedDocumentStatus;
@@ -61,7 +62,7 @@ class UploadedDocumentServiceTest {
     }
 
     @Test
-    void createDocumentReturnsPendingUploadAndPersistsOwnerScopedMetadata() {
+    void createDocumentReturnsPendingUploadWithoutPersistingMetadata() {
         CreatedUpload created = service.createDocument(
                 USER,
                 new CreateUploadedDocumentCommand("memo.pdf", "application/pdf", 128L)
@@ -73,7 +74,11 @@ class UploadedDocumentServiceTest {
                 "sample-documents/user-123/11111111-1111-1111-1111-111111111111/memo.pdf",
                 created.document().sourceObjectKey()
         );
-        assertEquals(created.document(), repository.findById(USER.userId(), created.document().id()).orElseThrow());
+        assertEquals("2026-03-29T06:00:00Z", created.document().createdAt());
+        assertEquals("2026-03-29T06:15:00Z", created.upload().expiresAt());
+        assertEquals("PUT", created.upload().uploadMethod());
+        assertEquals("application/pdf", created.upload().uploadHeaders().get("Content-Type"));
+        assertTrue(repository.findById(USER.userId(), created.document().id()).isEmpty());
         assertEquals(created.document().sourceObjectKey(), objectStore.lastUploadObjectKey);
         assertEquals(Duration.ofMinutes(15), objectStore.lastUploadExpiry);
     }
@@ -146,6 +151,30 @@ class UploadedDocumentServiceTest {
         ));
 
         assertThrows(NotFoundException.class, () -> service.getDocument(USER, "11111111-1111-1111-1111-111111111111"));
+    }
+
+    @Test
+    void completeUploadCreatesMetadataWhenUploadedObjectExists() {
+        objectStore.objectsByPrefix.put(
+                "sample-documents/user-123/33333333-3333-3333-3333-333333333333/",
+                new StoredUploadedObject(
+                        "sample-documents/user-123/33333333-3333-3333-3333-333333333333/memo.pdf",
+                        "application/pdf",
+                        512L
+                )
+        );
+
+        UploadedDocument completed = service.completeUpload(USER, "33333333-3333-3333-3333-333333333333");
+
+        assertEquals(UploadedDocumentStatus.AVAILABLE, completed.status());
+        assertEquals(USER.userId(), completed.ownerUserId());
+        assertEquals("memo.pdf", completed.filename());
+        assertEquals(512L, completed.sizeBytes());
+        assertEquals(
+                completed,
+                repository.findById(USER.userId(), "33333333-3333-3333-3333-333333333333").orElseThrow()
+        );
+        verify(recompileTrigger).requestRecompile();
     }
 
     @Test
@@ -357,6 +386,7 @@ class UploadedDocumentServiceTest {
     private static final class FakeUploadedDocumentObjectStore implements UploadedDocumentObjectStore {
 
         private final Map<String, Long> objectSizes = new HashMap<>();
+        private final Map<String, StoredUploadedObject> objectsByPrefix = new HashMap<>();
         private final List<String> deletedKeys = new ArrayList<>();
         private final List<String> deleteOperations;
         private RuntimeException deleteException;
@@ -395,6 +425,11 @@ class UploadedDocumentServiceTest {
         public Optional<Long> getObjectSize(String objectKey) {
             getObjectSizeCalls++;
             return Optional.ofNullable(objectSizes.get(objectKey));
+        }
+
+        @Override
+        public Optional<StoredUploadedObject> findObjectByPrefix(String objectKeyPrefix) {
+            return Optional.ofNullable(objectsByPrefix.get(objectKeyPrefix));
         }
 
         @Override
