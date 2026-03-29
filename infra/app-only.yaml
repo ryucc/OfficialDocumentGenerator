@@ -120,6 +120,8 @@ Resources:
 
   UploadedDocumentBucket:
     Type: AWS::S3::Bucket
+    DependsOn:
+      - EmailProcessingQueuePolicy
     Properties:
       CorsConfiguration:
         CorsRules:
@@ -140,6 +142,15 @@ Resources:
             Status: Enabled
             ExpirationInDays: 90
             Prefix: emails/
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Queue: !GetAtt EmailProcessingQueue.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: !Sub emails/${Stage}/
 
   # Bucket policy to allow SES to write emails to the shared bucket
   UploadedDocumentBucketPolicy:
@@ -202,6 +213,93 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: ses.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
+
+  # ---- Email Processing Pipeline (S3 → SQS → Lambda → DynamoDB) ----
+
+  # DynamoDB table to track email processing projects
+  ProjectsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub email-projects-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: projectId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: projectId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: projectId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # Dead Letter Queue for failed email processing
+  EmailProcessingDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub email-processing-dlq-${Stage}
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # SQS Queue for email processing
+  EmailProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub email-processing-${Stage}
+      VisibilityTimeout: 300  # 5 minutes
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmailProcessingDLQ.Arn
+        maxReceiveCount: 3
+
+  # Queue policy to allow S3 to send messages
+  EmailProcessingQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EmailProcessingQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action:
+              - sqs:SendMessage
+            Resource: !GetAtt EmailProcessingQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt UploadedDocumentBucket.Arn
+
+  # Lambda function to process emails and create projects
+  EmailProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub email-processor-${Stage}
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      CodeUri: ../lambda/email-processor
+      Timeout: 60
+      Environment:
+        Variables:
+          PROJECTS_TABLE: !Ref ProjectsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProjectsTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
+        - SQSPollerPolicy:
+            QueueName: !GetAtt EmailProcessingQueue.QueueName
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EmailProcessingQueue.Arn
+            BatchSize: 10
 
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
@@ -363,3 +461,12 @@ Outputs:
   SESVerificationToken:
     Description: SES domain verification token (already applied if HostedZoneId provided)
     Value: !GetAtt SESSetup.VerificationToken
+  ProjectsTableName:
+    Description: DynamoDB table for email processing projects
+    Value: !Ref ProjectsTable
+  EmailProcessingQueueUrl:
+    Description: SQS queue URL for email processing
+    Value: !Ref EmailProcessingQueue
+  EmailProcessorFunctionName:
+    Description: Lambda function for processing emails
+    Value: !Ref EmailProcessorFunction
