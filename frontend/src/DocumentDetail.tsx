@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from './config'
 import './DocumentDetail.css'
@@ -77,31 +77,6 @@ function DocumentDetail() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hour = date.getHours()
-      const minute = String(date.getMinutes()).padStart(2, '0')
-      const second = String(date.getSeconds()).padStart(2, '0')
-      const period = hour >= 12 ? '下午' : '上午'
-      const hour12 = hour % 12 || 12
-      const hourStr = String(hour12).padStart(2, '0')
-
-      return `${year}/${month}/${day} ${period}${hourStr}:${minute}:${second}`
-    } catch {
-      return dateString
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   const handleDownload = async () => {
