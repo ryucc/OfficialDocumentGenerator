@@ -60,6 +60,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 2rem;
   background: var(--bg-sidebar);
@@ -72,6 +73,16 @@ body {
 .nav-links {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .nav-link {
@@ -93,6 +104,27 @@ body {
   color: white;
 }
 
+.nav-user {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.nav-action {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-btn);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
 .theme-toggle-nav {
   padding: 0.5rem 1rem;
   background: transparent;
@@ -112,9 +144,48 @@ body {
   background: var(--hover);
 }
 
+.route-loading {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.route-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: route-spin 1s linear infinite;
+}
+
+@keyframes route-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Make app content fill remaining space */
-.app,
-.documents-container {
+.documents-container,
+.projects-container,
+.auth-page {
   flex: 1;
   overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .top-nav {
+    padding: 1rem;
+  }
+
+  .nav-links,
+  .nav-actions {
+    width: 100%;
+  }
+
+  .nav-actions {
+    justify-content: space-between;
+  }
 }

@@ -23,6 +23,7 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
     implementation("org.apache.poi:poi-ooxml:5.2.5")
     implementation(platform("software.amazon.awssdk:bom:2.25.29"))
+    implementation("software.amazon.awssdk:cognitoidentityprovider")
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:s3")
     compileOnly("jakarta.annotation:jakarta.annotation-api:2.1.1")

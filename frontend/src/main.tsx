@@ -1,12 +1,17 @@
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, Link, useLocation } from 'react-router-dom'
 import './index.css'
+import AuthPage from './AuthPage.tsx'
 import Documents from './Documents.tsx'
+import DocumentDetail from './DocumentDetail.tsx'
 import Projects from './Projects.tsx'
+import { AuthProvider, useAuth } from './auth.tsx'
 
 function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (theme: 'dark' | 'light') => void }) {
   const location = useLocation()
+  const { status, user, logout } = useAuth()
+  const isDocumentsRoute = location.pathname.startsWith('/documents')
 
   return (
     <nav className="top-nav">
@@ -19,16 +24,68 @@ function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (t
         </Link>
         <Link
           to="/documents"
-          className={`nav-link ${location.pathname === '/documents' ? 'active' : ''}`}
+          className={`nav-link ${isDocumentsRoute ? 'active' : ''}`}
         >
           範例管理
         </Link>
       </div>
-      <button className="theme-toggle-nav" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
+      <div className="nav-actions">
+        {status === 'authenticated' && user ? (
+          <>
+            <span className="nav-user">{user.email || user.userId}</span>
+            <button
+              className="nav-action"
+              onClick={() => {
+                void logout()
+              }}
+              type="button"
+            >
+              登出
+            </button>
+          </>
+        ) : (
+          <Link
+            to="/auth"
+            className={`nav-link ${location.pathname === '/auth' ? 'active' : ''}`}
+          >
+            登入
+          </Link>
+        )}
+        <button
+          className="theme-toggle-nav"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          type="button"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </div>
     </nav>
   )
+}
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { status } = useAuth()
+  const location = useLocation()
+
+  if (status === 'loading') {
+    return (
+      <div className="route-loading">
+        <div className="route-loading-spinner" />
+        <p>正在驗證登入狀態...</p>
+      </div>
+    )
+  }
+
+  if (status !== 'authenticated') {
+    return (
+      <Navigate
+        replace
+        to={`/auth?next=${encodeURIComponent(location.pathname + location.search)}`}
+      />
+    )
+  }
+
+  return children
 }
 
 function AppRouter() {
@@ -46,7 +103,23 @@ function AppRouter() {
       <Navigation theme={theme} setTheme={setTheme} />
       <Routes>
         <Route path="/" element={<Projects />} />
-        <Route path="/documents" element={<Documents />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route
+          path="/documents"
+          element={(
+            <ProtectedRoute>
+              <Documents />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/documents/:id"
+          element={(
+            <ProtectedRoute>
+              <DocumentDetail />
+            </ProtectedRoute>
+          )}
+        />
       </Routes>
     </>
   )
@@ -54,8 +127,10 @@ function AppRouter() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AppRouter />
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
+    </AuthProvider>
   </StrictMode>,
 )

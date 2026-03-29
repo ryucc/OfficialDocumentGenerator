@@ -1,8 +1,8 @@
 package com.officialpapers.api.service;
 
-public class NotFoundException extends RuntimeException {
+public class NotFoundException extends ApiException {
 
     public NotFoundException(String message) {
-        super(message);
+        super(404, "NOT_FOUND", message);
     }
 }

@@ -38,8 +38,14 @@ Resources:
       StageName: Prod
       Cors:
         AllowOrigin: "'*'"
-        AllowHeaders: "'Content-Type'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt DocumentUserPool.Arn
 
   SampleDocumentFunction:
     Type: AWS::Serverless::Function
@@ -59,7 +65,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
-                - dynamodb:Scan
+                - dynamodb:Query
               Resource: !GetAtt UploadedDocumentTable.Arn
             - Sid: UploadedDocumentObjectAccess
               Effect: Allow
@@ -113,17 +119,98 @@ Resources:
             Path: /api/v1/sample-documents/{documentId}
             Method: DELETE
 
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub auth-${Stage}
+      Handler: com.officialpapers.api.handler.AuthHandler
+      CodeUri: ../build/distributions/lambda.zip
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref DocumentUserPool
+          COGNITO_USER_POOL_CLIENT_ID: !Ref DocumentUserPoolClient
+      Policies:
+        - Statement:
+            - Sid: CognitoAuthApiAccess
+              Effect: Allow
+              Action:
+                - cognito-idp:InitiateAuth
+                - cognito-idp:RespondToAuthChallenge
+                - cognito-idp:ForgotPassword
+                - cognito-idp:ConfirmForgotPassword
+                - cognito-idp:GlobalSignOut
+                - cognito-idp:RevokeToken
+                - cognito-idp:GetUser
+              Resource: !GetAtt DocumentUserPool.Arn
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/login
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Refresh:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/refresh
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        RespondToNewPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/respond-to-new-password
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ForgotPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/forgot-password
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        ConfirmForgotPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/confirm-forgot-password
+            Method: POST
+            Auth:
+              Authorizer: NONE
+        Logout:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/logout
+            Method: POST
+        GetCurrentUser:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/auth/me
+            Method: GET
+
   UploadedDocumentTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub sample-documents-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
+        - AttributeName: ownerUserId
+          AttributeType: S
         - AttributeName: documentId
           AttributeType: S
       KeySchema:
-        - AttributeName: documentId
+        - AttributeName: ownerUserId
           KeyType: HASH
+        - AttributeName: documentId
+          KeyType: RANGE
 
   UploadedDocumentBucket:
     Type: AWS::S3::Bucket
@@ -191,6 +278,11 @@ Resources:
       ClientName: !Sub official-doc-generator-${Stage}-client
       UserPoolId: !Ref DocumentUserPool
       GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
   # ---- Email Pipeline Resources ----
 

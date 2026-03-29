@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import { API_BASE_URL } from './config'
+import { Link } from 'react-router-dom'
+import { createApiError, useAuth } from './auth'
 import './Documents.css'
 
 interface Document {
   id: string
   filename: string
   contentType: string
-  sizeBytes: number
+  sizeBytes: number | null
   status: string
   createdAt: string
   updatedAt: string
 }
 
 function Documents() {
+  const { authFetch } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,23 +22,27 @@ function Documents() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetchDocuments()
+    void fetchDocuments()
   }, [])
+
+  const resolveErrorMessage = (value: unknown, fallback: string) => (
+    value instanceof Error ? value.message : fallback
+  )
 
   const fetchDocuments = async () => {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await fetch(`${API_BASE_URL}/sample-documents`)
+      const response = await authFetch('/sample-documents')
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        throw await createApiError(response, '載入文件失敗')
       }
 
       const data = await response.json()
       setDocuments(data.items || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : '載入文件時發生錯誤')
+      setError(resolveErrorMessage(err, '載入文件時發生錯誤'))
       console.error('Error fetching documents:', err)
     } finally {
       setIsLoading(false)
@@ -67,11 +73,22 @@ function Documents() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  const isVisibleDocument = (
+    doc: Document,
+  ): doc is Document & { status: 'AVAILABLE'; sizeBytes: number } => {
+    return doc.status === 'AVAILABLE'
+      && typeof doc.sizeBytes === 'number'
+      && Number.isFinite(doc.sizeBytes)
+      && doc.sizeBytes > 0
+  }
+
+  const visibleDocuments = documents.filter(isVisibleDocument)
+
   const handleDownload = async (doc: Document) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/download-url`)
+      const response = await authFetch(`/sample-documents/${doc.id}/download-url`)
       if (!response.ok) {
-        throw new Error('無法取得下載連結')
+        throw await createApiError(response, '無法取得下載連結')
       }
 
       const data = await response.json()
@@ -83,7 +100,7 @@ function Documents() {
       window.document.body.removeChild(link)
     } catch (err) {
       console.error('Download error:', err)
-      alert('下載失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '下載失敗，請稍後再試'))
     }
   }
 
@@ -93,12 +110,12 @@ function Documents() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}`, {
+      const response = await authFetch(`/sample-documents/${doc.id}`, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('刪除失敗')
+        throw await createApiError(response, '刪除失敗')
       }
 
       // Refresh document list
@@ -106,7 +123,7 @@ function Documents() {
       alert('刪除成功')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('刪除失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '刪除失敗，請稍後再試'))
     }
   }
 
@@ -139,7 +156,7 @@ function Documents() {
       }
 
       // Step 1: Get presigned upload URL
-      const initResponse = await fetch(`${API_BASE_URL}/sample-documents`, {
+      const initResponse = await authFetch('/sample-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -147,11 +164,12 @@ function Documents() {
         body: JSON.stringify({
           filename: file.name,
           contentType: contentType,
+          sizeBytes: file.size,
         }),
       })
 
       if (!initResponse.ok) {
-        throw new Error('無法初始化上傳')
+        throw await createApiError(initResponse, '無法初始化上傳')
       }
 
       const { document: doc, upload } = await initResponse.json()
@@ -168,12 +186,12 @@ function Documents() {
       }
 
       // Step 3: Mark as complete
-      const completeResponse = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/complete`, {
+      const completeResponse = await authFetch(`/sample-documents/${doc.id}/complete`, {
         method: 'POST',
       })
 
       if (!completeResponse.ok) {
-        console.warn('Failed to mark upload as complete')
+        throw await createApiError(completeResponse, '檔案已上傳，但無法完成整理，請重新整理後再試')
       }
 
       // Refresh document list
@@ -182,7 +200,7 @@ function Documents() {
       alert('上傳成功！')
     } catch (err) {
       console.error('Upload error:', err)
-      alert(err instanceof Error ? err.message : '上傳失敗，請稍後再試')
+      alert(resolveErrorMessage(err, '上傳失敗，請稍後再試'))
     } finally {
       setIsUploading(false)
       // Reset file input
@@ -218,10 +236,23 @@ function Documents() {
   return (
     <div className="documents-container">
       <div className="documents-header">
-        <h1>範例管理</h1>
+        <div className="documents-heading">
+          <h1>範例管理</h1>
+          <p>登入後可管理範例文件，並透過受保護的 API 下載或刪除。</p>
+        </div>
+        <button
+          onClick={handleUploadClick}
+          className="upload-btn"
+          disabled={isUploading}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {isUploading ? '上傳中...' : '上傳文件'}
+        </button>
       </div>
 
-      {documents.length === 0 ? (
+      {visibleDocuments.length === 0 ? (
         <div className="empty-state">
           <p>目前沒有文件</p>
         </div>
@@ -237,11 +268,13 @@ function Documents() {
             </tr>
           </thead>
           <tbody>
-            {documents.map((doc) => (
+            {visibleDocuments.map((doc) => (
               <tr key={doc.id}>
                 <td className="doc-name">
                   <div className="doc-name-content">
-                    <span className="filename">{doc.filename}</span>
+                    <Link className="filename-link" to={`/documents/${doc.id}`}>
+                      <span className="filename">{doc.filename}</span>
+                    </Link>
                   </div>
                 </td>
                 <td className="doc-date">
