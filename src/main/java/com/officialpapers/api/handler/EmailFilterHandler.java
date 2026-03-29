@@ -59,16 +59,40 @@ public class EmailFilterHandler implements RequestHandler<Map<String, Object>, M
 
             String source = (String) mail.get("source");
             if (source == null) {
-                context.getLogger().log("No source found, allowing by default");
-                response.put("disposition", "CONTINUE");
+                context.getLogger().log("No source found, blocking");
+                response.put("disposition", "STOP_RULE");
                 return response;
             }
 
             context.getLogger().log("Email from: " + source);
 
+            // Check SPF and DKIM verification status to prevent spoofing
+            @SuppressWarnings("unchecked")
+            Map<String, Object> receipt = (Map<String, Object>) ses.get("receipt");
+            if (receipt != null) {
+                String spfVerdict = getVerdict(receipt.get("spfVerdict"));
+                String dkimVerdict = getVerdict(receipt.get("dkimVerdict"));
+
+                context.getLogger().log("SPF: " + spfVerdict + ", DKIM: " + dkimVerdict);
+
+                // Reject if both SPF and DKIM fail (likely spoofed)
+                if ("FAIL".equals(spfVerdict) && "FAIL".equals(dkimVerdict)) {
+                    context.getLogger().log("Both SPF and DKIM failed, blocking potential spoofed email");
+                    response.put("disposition", "STOP_RULE");
+                    return response;
+                }
+
+                // For Gmail, require DKIM to pass (Gmail signs all outgoing mail)
+                if (source.toLowerCase().endsWith("@gmail.com") && !"PASS".equals(dkimVerdict)) {
+                    context.getLogger().log("Gmail sender without valid DKIM signature, blocking");
+                    response.put("disposition", "STOP_RULE");
+                    return response;
+                }
+            }
+
             // Check if sender is in allowlist
             if (allowedSenders.contains(source.toLowerCase())) {
-                context.getLogger().log("Sender allowed: " + source);
+                context.getLogger().log("Sender allowed and verified: " + source);
                 response.put("disposition", "CONTINUE");
             } else {
                 context.getLogger().log("Sender not in allowlist, blocking: " + source);
@@ -82,5 +106,15 @@ public class EmailFilterHandler implements RequestHandler<Map<String, Object>, M
         }
 
         return response;
+    }
+
+    private String getVerdict(Object verdictObj) {
+        if (verdictObj == null) {
+            return "UNKNOWN";
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> verdict = (Map<String, Object>) verdictObj;
+        Object status = verdict.get("status");
+        return status != null ? status.toString() : "UNKNOWN";
     }
 }
