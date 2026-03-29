@@ -62,6 +62,27 @@ Resources:
             Path: /api/v1/document-instructions/{instructionId}
             Method: DELETE
 
+  # ---- Email Filter (runs first to block non-allowlisted senders) ----
+  EmailFilterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub email-filter-${Stage}
+      Handler: com.officialpapers.api.handler.EmailFilterHandler
+      CodeUri: ../build/distributions/lambda.zip
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          ALLOWED_SENDERS: shortyliu@gmail.com
+
+  EmailFilterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt EmailFilterFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: ses.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
   # ---- Email Processor ----
   EmailProcessorFunction:
     Type: AWS::Serverless::Function
@@ -71,6 +92,9 @@ Resources:
       CodeUri: ../build/distributions/lambda.zip
       MemorySize: 1024
       Timeout: 300
+      Environment:
+        Variables:
+          ALLOWED_SENDERS: shortyliu@gmail.com
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref DocumentBucket
@@ -159,6 +183,9 @@ Resources:
         Recipients:
           - gongwengpt.click
         Actions:
+          - LambdaAction:
+              FunctionArn: !GetAtt EmailFilterFunction.Arn
+              InvocationType: RequestResponse
           - S3Action:
               BucketName: !Ref DocumentBucket
               ObjectKeyPrefix: emails/
