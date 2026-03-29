@@ -7,6 +7,14 @@ Parameters:
     Type: String
     Default: test
     AllowedValues: [test]
+  ApiDomainName:
+    Type: String
+    Default: api.gongwengpt.click
+    Description: Custom domain name for API Gateway
+  HostedZoneId:
+    Type: String
+    Default: Z08801051G2GR30IAD1A4
+    Description: Route 53 Hosted Zone ID for gongwengpt.click
 
 Globals:
   Function:
@@ -135,10 +143,49 @@ Resources:
       UserPoolId: !Ref DocumentUserPool
       GenerateSecret: false
 
+  ApiCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref ApiDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref ApiDomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  ApiCustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref ApiDomainName
+      RegionalCertificateArn: !Ref ApiCertificate
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !Ref ApiCustomDomain
+      RestApiId: !Ref DocumentApi
+      Stage: !Ref DocumentApiProdStage
+
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
+        EvaluateTargetHealth: false
+
 Outputs:
   ApiUrl:
     Description: API Gateway URL
     Value: !Sub https://${DocumentApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/sample-documents
+  CustomApiUrl:
+    Description: Custom Domain API URL
+    Value: !Sub https://${ApiDomainName}/api/v1/sample-documents
   TableName:
     Value: !Ref UploadedDocumentTable
   BucketName:
