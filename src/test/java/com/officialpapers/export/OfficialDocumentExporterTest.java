@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +26,7 @@ class OfficialDocumentExporterTest {
 
     private final OfficialDocumentExporter exporter = new OfficialDocumentExporter();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Path sampleJsonPath = Path.of("sample data", "123義大利網紅邀訪案.json");
+    private final Path sampleJsonPath = resourcePath("exporter/sample-data/123義大利網紅邀訪案.json");
 
     @TempDir
     Path tempDir;
@@ -128,6 +129,30 @@ class OfficialDocumentExporterTest {
         assertEquals("Missing required field: 附件二.行程表", exception.getMessage());
     }
 
+    @Test
+    void cliRequiresExplicitInputJsonProperty() {
+        String originalInputJson = System.getProperty("officialDocument.inputJson");
+        String originalOutputDir = System.getProperty("officialDocument.outputDir");
+
+        System.clearProperty("officialDocument.inputJson");
+        System.clearProperty("officialDocument.outputDir");
+
+        try {
+            IllegalArgumentException exception = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> OfficialDocumentExporterCli.main(new String[0])
+            );
+
+            assertEquals(
+                    "Missing required system property: officialDocument.inputJson. Pass -PinputJson=/path/to/document.json to Gradle.",
+                    exception.getMessage()
+            );
+        } finally {
+            restoreSystemProperty("officialDocument.inputJson", originalInputJson);
+            restoreSystemProperty("officialDocument.outputDir", originalOutputDir);
+        }
+    }
+
     private String joinedCellText(XWPFDocument document, int tableIndex, int rowIndex, int cellIndex) {
         return String.join(
                 " | ",
@@ -150,6 +175,25 @@ class OfficialDocumentExporterTest {
         Path inputJson = tempDir.resolve("fixture.json");
         Files.writeString(inputJson, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
         return inputJson;
+    }
+
+    private Path resourcePath(String resourcePath) {
+        try {
+            return Path.of(Objects.requireNonNull(
+                    getClass().getClassLoader().getResource(resourcePath),
+                    "Missing test resource: " + resourcePath
+            ).toURI());
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to resolve test resource: " + resourcePath, exception);
+        }
+    }
+
+    private void restoreSystemProperty(String propertyName, String value) {
+        if (value == null) {
+            System.clearProperty(propertyName);
+        } else {
+            System.setProperty(propertyName, value);
+        }
     }
 
     private boolean paragraphStartsOnNewPage(Path docxPath, String marker) throws Exception {

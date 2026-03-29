@@ -4,18 +4,19 @@ import java.nio.file.Path;
 
 public final class OfficialDocumentExporterCli {
 
+    private static final String INPUT_JSON_PROPERTY = "officialDocument.inputJson";
+    private static final String OUTPUT_DIR_PROPERTY = "officialDocument.outputDir";
+    private static final String DEFAULT_OUTPUT_DIRECTORY = "build/official-documents";
+
     private OfficialDocumentExporterCli() {
     }
 
     public static void main(String[] args) throws Exception {
         Path projectRoot = Path.of("").toAbsolutePath().normalize();
-        Path inputJson = resolvePath(
-                projectRoot,
-                System.getProperty("officialDocument.inputJson", "sample data/123義大利網紅邀訪案.json")
-        );
+        Path inputJson = resolvePath(projectRoot, requireProperty(INPUT_JSON_PROPERTY));
         Path outputDirectory = resolvePath(
                 projectRoot,
-                System.getProperty("officialDocument.outputDir", "writeTest")
+                System.getProperty(OUTPUT_DIR_PROPERTY, DEFAULT_OUTPUT_DIRECTORY)
         );
 
         try {
@@ -25,6 +26,17 @@ public final class OfficialDocumentExporterCli {
             System.err.println("Failed to export official document: " + exception.getMessage());
             throw exception;
         }
+    }
+
+    private static String requireProperty(String propertyName) {
+        String value = System.getProperty(propertyName);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Missing required system property: " + propertyName
+                            + ". Pass -PinputJson=/path/to/document.json to Gradle."
+            );
+        }
+        return value;
     }
 
     private static Path resolvePath(Path projectRoot, String value) {

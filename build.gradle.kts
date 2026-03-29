@@ -85,13 +85,12 @@ tasks.register<JavaExec>("exportOfficialDocument") {
     dependsOn("classes")
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("com.officialpapers.export.OfficialDocumentExporterCli")
-    systemProperty(
-        "officialDocument.inputJson",
-        project.findProperty("inputJson")?.toString() ?: "sample data/123義大利網紅邀訪案.json"
-    )
+    project.findProperty("inputJson")?.toString()?.let {
+        systemProperty("officialDocument.inputJson", it)
+    }
     systemProperty(
         "officialDocument.outputDir",
-        project.findProperty("outputDir")?.toString() ?: "writeTest"
+        project.findProperty("outputDir")?.toString() ?: "build/official-documents"
     )
 }
 
