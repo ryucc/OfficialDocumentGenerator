@@ -64,6 +64,7 @@ Resources:
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
                 - dynamodb:Query
+                - dynamodb:Scan
               Resource: !GetAtt UploadedDocumentTable.Arn
             - Sid: UploadedDocumentObjectAccess
               Effect: Allow
