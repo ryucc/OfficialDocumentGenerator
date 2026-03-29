@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: Official Document Generator API
+  version: 0.1.0
+  summary: API for managing document-writing instructions
+  description: |
+    This API supports managing document-writing instructions through CRUD operations.
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: https://staging-api.example.com/v1
+    description: Staging
+
+tags:
+  - name: Document Instructions
+
+security:
+  - bearerAuth: []
+
+paths:
+  /document-instructions:
+    get:
+      tags: [Document Instructions]
+      summary: List document-writing instructions
+      operationId: listDocumentInstructions
+      responses:
+        '200':
+          description: Instructions returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentInstruction'
+    post:
+      tags: [Document Instructions]
+      summary: Create a document-writing instruction
+      operationId: createDocumentInstruction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentInstructionCreateRequest'
+      responses:
+        '201':
+          description: Instruction created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentInstruction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /document-instructions/{instructionId}:
+    get:
+      tags: [Document Instructions]
+      summary: Get a document-writing instruction
+      operationId: getDocumentInstruction
+      parameters:
+        - $ref: '#/components/parameters/InstructionId'
+      responses:
+        '200':
+          description: Instruction returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentInstruction'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Document Instructions]
+      summary: Update a document-writing instruction
+      operationId: updateDocumentInstruction
+      parameters:
+        - $ref: '#/components/parameters/InstructionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentInstructionUpdateRequest'
+      responses:
+        '200':
+          description: Instruction updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentInstruction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Document Instructions]
+      summary: Delete a document-writing instruction
+      operationId: deleteDocumentInstruction
+      parameters:
+        - $ref: '#/components/parameters/InstructionId'
+      responses:
+        '204':
+          description: Instruction deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    InstructionId:
+      name: instructionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+
+  schemas:
+    DocumentInstruction:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DocumentInstructionCreateRequest:
+      type: object
+      required:
+        - title
+        - content
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+
+    DocumentInstructionUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+      additionalProperties: false
+
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
