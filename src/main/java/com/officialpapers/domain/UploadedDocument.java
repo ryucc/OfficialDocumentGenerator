@@ -7,6 +7,7 @@ public record UploadedDocument(
         Long sizeBytes,
         UploadedDocumentStatus status,
         String sourceObjectKey,
+        String textObjectKey,
         String createdAt,
         String updatedAt
 ) {

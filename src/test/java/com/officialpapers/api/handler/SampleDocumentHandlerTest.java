@@ -225,6 +225,7 @@ class SampleDocumentHandlerTest {
                 512L,
                 status,
                 "sample-documents/" + id + "/memo.pdf",
+                null,
                 "2026-03-29T06:00:00Z",
                 "2026-03-29T06:05:00Z"
         );

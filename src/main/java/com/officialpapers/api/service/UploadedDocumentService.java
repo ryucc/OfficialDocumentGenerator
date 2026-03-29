@@ -83,6 +83,7 @@ public class UploadedDocumentService {
                 request.sizeBytes(),
                 UploadedDocumentStatus.PENDING_UPLOAD,
                 buildObjectKey(documentId, request.filename().trim()),
+                null,
                 timestamp,
                 timestamp
         );
@@ -118,6 +119,7 @@ public class UploadedDocumentService {
                     objectSize,
                     UploadedDocumentStatus.AVAILABLE,
                     current.sourceObjectKey(),
+                    current.textObjectKey(),
                     current.createdAt(),
                     timestamp
             );
@@ -138,6 +140,7 @@ public class UploadedDocumentService {
                 uploadedObject.sizeBytes(),
                 UploadedDocumentStatus.AVAILABLE,
                 uploadedObject.objectKey(),
+                null,
                 timestamp,
                 timestamp
         );
@@ -163,6 +166,14 @@ public class UploadedDocumentService {
         repository.deleteById(documentId);
         try {
             objectStore.delete(existing.sourceObjectKey());
+            // Also delete the text extraction file if it exists
+            if (existing.textObjectKey() != null) {
+                try {
+                    objectStore.delete(existing.textObjectKey());
+                } catch (RuntimeException textException) {
+                    // Log but don't fail if text file deletion fails
+                }
+            }
         } catch (RuntimeException exception) {
             throw new IllegalStateException("Failed to delete uploaded object", exception);
         }

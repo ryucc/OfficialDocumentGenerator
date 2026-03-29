@@ -215,6 +215,9 @@ components:
           minimum: 0
         status:
           $ref: '#/components/schemas/SampleDocumentStatus'
+        textObjectKey:
+          type: string
+          description: S3 key of the extracted text file (.txt)
         createdAt:
           type: string
           format: date-time
