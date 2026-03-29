@@ -1,6 +1,6 @@
 package com.officialpapers.api.di;
 
-import com.officialpapers.api.handler.DocumentInstructionHandler;
+import com.officialpapers.api.handler.SampleDocumentHandler;
 import dagger.Component;
 
 import javax.inject.Singleton;
@@ -9,5 +9,5 @@ import javax.inject.Singleton;
 @Component(modules = LambdaModule.class)
 public interface LambdaComponent {
 
-    DocumentInstructionHandler handler();
+    SampleDocumentHandler handler();
 }

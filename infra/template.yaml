@@ -29,78 +29,128 @@ Globals:
 Resources:
 
   # ---- API ----
-  DocumentInstructionFunction:
+  DocumentApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub official-doc-generator-api-${Stage}
+      StageName: Prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type'"
+        AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+
+  SampleDocumentFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub document-instruction-${Stage}
-      Handler: com.officialpapers.api.handler.DocumentInstructionHandler
+      FunctionName: !Sub sample-document-${Stage}
+      Handler: com.officialpapers.api.handler.SampleDocumentHandler
       CodeUri: ../build/distributions/lambda.zip
       Environment:
         Variables:
-          INSTRUCTION_METADATA_TABLE: !Ref DocumentInstructionTable
-          INSTRUCTION_CONTENT_BUCKET: !Ref DocumentBucket
+          UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable
+          UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
       Policies:
         - Statement:
-            - Sid: InstructionMetadataAccess
+            - Sid: UploadedDocumentMetadataAccess
               Effect: Allow
               Action:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
                 - dynamodb:Scan
-              Resource: !GetAtt DocumentInstructionTable.Arn
-            - Sid: InstructionContentAccess
+              Resource: !GetAtt UploadedDocumentTable.Arn
+            - Sid: UploadedDocumentObjectAccess
               Effect: Allow
               Action:
                 - s3:GetObject
                 - s3:PutObject
                 - s3:DeleteObject
-              Resource: !Sub ${DocumentBucket.Arn}/*
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/*
       Events:
-        ListInstructions:
+        ListSampleDocuments:
           Type: Api
           Properties:
-            Path: /api/v1/document-instructions
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents
             Method: GET
-        CreateInstruction:
+        CreateSampleDocument:
           Type: Api
           Properties:
-            Path: /api/v1/document-instructions
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents
             Method: POST
-        GetInstruction:
+        GetSampleDocument:
           Type: Api
           Properties:
-            Path: /api/v1/document-instructions/{instructionId}
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}
             Method: GET
-        UpdateInstruction:
+        CompleteSampleDocumentUpload:
           Type: Api
           Properties:
-            Path: /api/v1/document-instructions/{instructionId}
-            Method: PUT
-        DeleteInstruction:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}/complete
+            Method: POST
+        GetSampleDocumentDownloadUrl:
           Type: Api
           Properties:
-            Path: /api/v1/document-instructions/{instructionId}
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}/download-url
+            Method: GET
+        DeleteSampleDocument:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/sample-documents/{documentId}
             Method: DELETE
 
-  # ---- DynamoDB (Test) ----
-  DocumentInstructionTable:
+  # ---- DynamoDB ----
+  UploadedDocumentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub document-instructions-${Stage}
+      TableName: !Sub sample-documents-${Stage}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: instructionId
+        - AttributeName: documentId
           AttributeType: S
       KeySchema:
-        - AttributeName: instructionId
+        - AttributeName: documentId
           KeyType: HASH
 
-  # ---- S3 (Test) ----
-  DocumentBucket:
+  # ---- S3 ----
+  UploadedDocumentBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub official-doc-generator-${Stage}-${AWS::AccountId}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 300
+
+  # ---- Cognito Scaffolding ----
+  DocumentUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub official-doc-generator-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+
+  DocumentUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub official-doc-generator-${Stage}-client
+      UserPoolId: !Ref DocumentUserPool
+      GenerateSecret: false
 
   # ---- CodePipeline ----
   ArtifactBucket:
@@ -189,7 +239,7 @@ Resources:
   BuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub official-doc-generator-build-${Stage}
+      Name: !Sub official-doc-generator-build-${Stage}-${AWS::StackName}
       ServiceRole: !GetAtt BuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -204,7 +254,7 @@ Resources:
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Sub official-doc-generator-${Stage}
+      Name: !Sub official-doc-generator-${Stage}-${AWS::StackName}
       RoleArn: !GetAtt PipelineRole.Arn
       ArtifactStore:
         Type: S3
@@ -259,14 +309,20 @@ Resources:
 Outputs:
   ApiUrl:
     Description: API Gateway URL
-    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/document-instructions
+    Value: !Sub https://${DocumentApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/v1/sample-documents
   TableName:
-    Value: !Ref DocumentInstructionTable
+    Value: !Ref UploadedDocumentTable
   BucketName:
-    Value: !Ref DocumentBucket
-  InstructionMetadataTableName:
-    Description: DynamoDB table for instruction metadata
-    Value: !Ref DocumentInstructionTable
-  InstructionContentBucketName:
-    Description: S3 bucket for instruction content
-    Value: !Ref DocumentBucket
+    Value: !Ref UploadedDocumentBucket
+  UploadedDocumentMetadataTableName:
+    Description: DynamoDB table for uploaded document metadata
+    Value: !Ref UploadedDocumentTable
+  UploadedDocumentBucketName:
+    Description: S3 bucket for uploaded source documents
+    Value: !Ref UploadedDocumentBucket
+  CognitoUserPoolId:
+    Description: Cognito user pool scaffold identifier
+    Value: !Ref DocumentUserPool
+  CognitoUserPoolClientId:
+    Description: Cognito user pool client scaffold identifier
+    Value: !Ref DocumentUserPoolClient
