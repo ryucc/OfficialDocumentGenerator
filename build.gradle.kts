@@ -21,6 +21,7 @@ dependencies {
     implementation("com.google.dagger:dagger:2.51.1")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.0")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
     implementation(platform("software.amazon.awssdk:bom:2.25.29"))
     implementation("software.amazon.awssdk:dynamodb")
     implementation("software.amazon.awssdk:s3")
@@ -76,6 +77,21 @@ openApiGenerate {
 
 tasks.named("compileJava") {
     dependsOn("openApiGenerate")
+}
+
+tasks.register<JavaExec>("exportOfficialDocument") {
+    group = "application"
+    description = "Exports a filled official-document JSON file to DOCX."
+    dependsOn("classes")
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.officialpapers.export.OfficialDocumentExporterCli")
+    project.findProperty("inputJson")?.toString()?.let {
+        systemProperty("officialDocument.inputJson", it)
+    }
+    systemProperty(
+        "officialDocument.outputDir",
+        project.findProperty("outputDir")?.toString() ?: "build/official-documents"
+    )
 }
 
 tasks.register<Zip>("packageLambda") {

@@ -113,6 +113,27 @@ java -jar build/libs/official-paper-gpt-0.1.0.jar --spring.profiles.active=prod
 - The application uses JWT-based authentication (placeholder - needs implementation)
 - Document instruction management provides CRUD operations for storing and retrieving document templates
 
+## Official Document Export
+
+The JSON-to-DOCX exporter only needs:
+- a filled JSON file passed through `-PinputJson`
+- the built-in DOCX template at `src/main/resources/templates/important-person-invitation-template.docx`
+
+Example:
+
+```bash
+./gradlew exportOfficialDocument -PinputJson=/absolute/or/relative/path/to/document.json
+```
+
+Optional output directory:
+
+```bash
+./gradlew exportOfficialDocument -PinputJson=/path/to/document.json -PoutputDir=/path/to/output-dir
+```
+
+If `-PoutputDir` is omitted, the exporter writes to `build/official-documents`.
+Sample inputs and generated inspection files live under `src/test/resources/exporter/` and are not required for standard conversion.
+
 ## License
 
 This project is part of a university assignment.
