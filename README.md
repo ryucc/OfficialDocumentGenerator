@@ -84,13 +84,13 @@ Access the H2 database console at:
 
 ## Configuration
 
+All configuration is in `src/main/resources/application.yaml`.
+
 ### Development Profile (default)
-Uses H2 in-memory database. Configuration in `application.properties`.
+Uses H2 in-memory database.
 
 ### Production Profile
-Uses PostgreSQL database. Configuration in `application-prod.properties`.
-
-To run with production profile:
+Uses PostgreSQL database. Run with:
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=prod
 ```
