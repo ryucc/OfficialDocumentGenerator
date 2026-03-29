@@ -2,11 +2,11 @@ import json
 import os
 import boto3
 from datetime import datetime
-import anthropic
 
 s3 = boto3.client('s3')
 textract = boto3.client('textract')
 dynamodb = boto3.resource('dynamodb')
+bedrock = boto3.client('bedrock-runtime')
 
 
 def lambda_handler(event, context):
@@ -222,14 +222,7 @@ def extract_text_from_word(document_bytes):
 
 
 def generate_document_with_claude(instructions, email_subject, email_body, attachment_texts):
-    """Use Claude API to generate the official document JSON."""
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        print("ANTHROPIC_API_KEY not set")
-        return None
-
-    client = anthropic.Anthropic(api_key=api_key)
-
+    """Use Claude via AWS Bedrock to generate the official document JSON."""
     # Build context
     context_parts = [
         f"# Email Subject\n{email_subject}\n",
@@ -262,16 +255,27 @@ Please generate a complete JSON object that follows the OfficialDocumentData str
 Return ONLY the JSON object, no additional text or explanation."""
 
     try:
-        message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=8000,
-            messages=[{
-                "role": "user",
-                "content": prompt
-            }]
+        # Use Claude 3.5 Sonnet via Bedrock
+        model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+
+        request_body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 8000,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
+
+        response = bedrock.invoke_model(
+            modelId=model_id,
+            body=json.dumps(request_body)
         )
 
-        response_text = message.content[0].text
+        response_body = json.loads(response['body'].read())
+        response_text = response_body['content'][0]['text']
 
         # Extract JSON from response (in case there's any wrapper text)
         if '```json' in response_text:
@@ -285,11 +289,11 @@ Return ONLY the JSON object, no additional text or explanation."""
 
         # Parse and validate JSON
         document_data = json.loads(response_text)
-        print("Successfully generated document JSON with Claude")
+        print("Successfully generated document JSON with Claude via Bedrock")
         return document_data
 
     except Exception as e:
-        print(f"Error calling Claude API: {str(e)}")
+        print(f"Error calling Bedrock Claude: {str(e)}")
         return None
 
 

@@ -451,7 +451,6 @@ Resources:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
           UPLOADED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
-          ANTHROPIC_API_KEY: '{{resolve:secretsmanager:anthropic-api-key:SecretString:ANTHROPIC_API_KEY}}'
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
@@ -468,6 +467,11 @@ Resources:
               Action:
                 - textract:DetectDocumentText
               Resource: '*'
+            - Sid: BedrockInvokeModel
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
