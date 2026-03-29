@@ -203,54 +203,6 @@ Resources:
       Principal: ses.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
-  # DynamoDB table to track received emails
-  ReceivedEmailTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub received-emails-${Stage}
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: messageId
-          AttributeType: S
-        - AttributeName: receivedAt
-          AttributeType: S
-      KeySchema:
-        - AttributeName: messageId
-          KeyType: HASH
-        - AttributeName: receivedAt
-          KeyType: RANGE
-      TimeToLiveSpecification:
-        AttributeName: ttl
-        Enabled: true
-
-  # Lambda function to log email metadata
-  EmailMetadataFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub email-metadata-${Stage}
-      Runtime: python3.12
-      Handler: index.lambda_handler
-      CodeUri: ../lambda/email-metadata
-      Timeout: 30
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref ReceivedEmailTable
-          EMAIL_BUCKET: !Ref UploadedDocumentBucket
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ReceivedEmailTable
-        - S3ReadPolicy:
-            BucketName: !Ref UploadedDocumentBucket
-
-  # Lambda permission for S3 to invoke metadata function
-  EmailMetadataFunctionPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref EmailMetadataFunction
-      Action: lambda:InvokeFunction
-      Principal: s3.amazonaws.com
-      SourceAccount: !Ref AWS::AccountId
-
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
     Type: AWS::SES::ReceiptRuleSet
@@ -399,9 +351,6 @@ Outputs:
   CognitoUserPoolClientId:
     Description: Cognito user pool client scaffold identifier
     Value: !Ref DocumentUserPoolClient
-  ReceivedEmailTableName:
-    Description: DynamoDB table for received email metadata
-    Value: !Ref ReceivedEmailTable
   EmailReceiptRuleSetName:
     Description: SES Receipt Rule Set name
     Value: !Ref EmailReceiptRuleSet

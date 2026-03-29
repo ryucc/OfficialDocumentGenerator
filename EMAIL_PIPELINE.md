@@ -7,10 +7,8 @@ This document describes the email receiving pipeline for `ai@gongwengpt.click`.
 The pipeline receives emails at `ai@gongwengpt.click`, filters by sender allowlist, and stores emails in S3:
 
 1. **AWS SES** receives emails to `ai@gongwengpt.click`
-2. **Lambda Filter** checks if sender is in allowlist
+2. **Lambda Filter** checks if sender is in allowlist and validates SPF/DKIM/DMARC
 3. **S3 Storage** saves allowed emails to `s3://<bucket>/emails/<stage>/`
-4. **Lambda Metadata** extracts email metadata and stores in DynamoDB
-5. **DynamoDB** indexes emails for quick lookup
 
 ## Current Configuration
 
@@ -67,8 +65,7 @@ If you don't provide `Route53HostedZoneId`, you'll need to manually add:
 ### What Gets Deployed
 
 CloudFormation will automatically:
-- ✅ Deploy Lambda functions (email filter, metadata extractor, SES setup)
-- ✅ Create DynamoDB table for email metadata
+- ✅ Deploy Lambda functions (email filter, SES setup)
 - ✅ Create SES receipt rule set and rules
 - ✅ Verify domain with SES (via custom resource)
 - ✅ Activate SES receipt rule set (via custom resource)
@@ -121,26 +118,7 @@ BUCKET=$(aws cloudformation describe-stacks \
 aws s3 ls "s3://${BUCKET}/emails/" --recursive --human-readable | tail -20
 ```
 
-### Query Email Metadata
-
-```bash
-# Get table name
-TABLE_NAME=$(aws cloudformation describe-stacks \
-  --stack-name official-doc-generator-app-test \
-  --query 'Stacks[0].Outputs[?OutputKey==`ReceivedEmailTableName`].OutputValue' \
-  --output text)
-
-# Query recent emails
-aws dynamodb scan \
-  --table-name $TABLE_NAME \
-  --max-items 10 \
-  --query 'Items[*].[receivedAt.S, from.S, subject.S]' \
-  --output table
-```
-
-Or use **AWS Console**:
-- S3: Navigate to bucket → `emails/test/` folder
-- DynamoDB: Navigate to `received-emails-test` table
+Or use **AWS Console**: S3 → Navigate to bucket → `emails/test/` folder
 
 ### Download an Email
 
@@ -161,17 +139,13 @@ cat email.eml
 ## Lambda Functions
 
 ### email-filter/index.py
-Filters incoming emails by checking sender against allowlist. Returns:
+Filters incoming emails by:
+1. Validating sender authentication (SPF/DKIM/DMARC)
+2. Checking sender against allowlist
+
+Returns:
 - `CONTINUE` - Allow email processing (save to S3)
 - `STOP_RULE` - Reject email (do not save)
-
-### email-metadata/index.py
-Triggered by S3 when email is saved. Extracts metadata from email and stores in DynamoDB:
-- Message ID
-- From/To addresses
-- Subject
-- Received timestamp
-- S3 location
 
 ### ses-setup/index.py
 Custom CloudFormation resource that:
@@ -198,16 +172,8 @@ BUCKET=$(aws cloudformation describe-stacks \
   --output text)
 aws s3 ls "s3://${BUCKET}/emails/" --recursive
 
-# Check DynamoDB
-TABLE_NAME=$(aws cloudformation describe-stacks \
-  --stack-name official-doc-generator-app-test \
-  --query 'Stacks[0].Outputs[?OutputKey==`ReceivedEmailTableName`].OutputValue' \
-  --output text)
-aws dynamodb scan --table-name $TABLE_NAME
-
 # Check Lambda logs
 aws logs tail /aws/lambda/email-filter-test --follow
-aws logs tail /aws/lambda/email-metadata-test --follow
 ```
 
 ## Troubleshooting
@@ -275,9 +241,10 @@ aws cloudformation describe-stacks \
 ```
 
 Key outputs:
-- `EmailAddress` - The configured email address
+- `EmailAddress` - The configured email address (ai@gongwengpt.click)
 - `UploadedDocumentBucketName` - S3 bucket where emails are stored
-- `ReceivedEmailTableName` - DynamoDB table with email metadata
+- `EmailReceiptRuleSetName` - SES receipt rule set name
+- `EmailFilterFunctionName` - Lambda function for filtering emails
 - `SESVerificationToken` - Domain verification token (if manual DNS needed)
 
 ## Cost Estimation
