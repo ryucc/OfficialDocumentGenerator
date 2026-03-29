@@ -24,6 +24,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Node
+node_modules/
+dist/
+
 # Application
 application-local.properties
 application-local.yaml
