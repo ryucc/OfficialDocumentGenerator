@@ -145,6 +145,7 @@ Resources:
                 ConnectionArn: !Ref CodeStarConnectionArn
                 FullRepositoryId: !Sub ${GitHubOwner}/${GitHubRepo}
                 BranchName: !Ref GitHubBranch
+                DetectChanges: true
               OutputArtifacts:
                 - Name: SourceOutput
         - Name: Build
