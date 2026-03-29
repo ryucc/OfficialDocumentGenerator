@@ -1,4 +1,5 @@
 import { useEditor, EditorContent } from '@tiptap/react'
+import { useEffect } from 'react'
 import StarterKit from '@tiptap/starter-kit'
 import './RichEditor.css'
 
@@ -43,6 +44,12 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
       },
     },
   })
+
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content)
+    }
+  }, [content, editor])
 
   return (
     <div className="rich-editor">

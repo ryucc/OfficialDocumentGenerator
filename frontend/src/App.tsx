@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import DOMPurify from 'dompurify'
 import { listInstructions, createInstruction, deleteInstruction, type DocumentInstruction } from './api'
 import RichEditor from './RichEditor'
 import './App.css'
@@ -246,7 +247,7 @@ function App() {
                         &times;
                       </button>
                     </div>
-                    <div className="instruction-content" dangerouslySetInnerHTML={{ __html: inst.content }} />
+                    <div className="instruction-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inst.content) }} />
                     <p className="instruction-date">
                       {new Date(inst.createdAt).toLocaleString('zh-TW')}
                     </p>
