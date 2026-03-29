@@ -115,6 +115,21 @@ class OfficialDocumentExporterTest {
     }
 
     @Test
+    void exportRejectsNullInviteeAttachment() throws Exception {
+        Path inputJson = writeJson(root -> {
+            ObjectNode attachment = (ObjectNode) root.get("附件一");
+            attachment.putNull("名單");
+        });
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> exporter.export(inputJson, tempDir)
+        );
+
+        assertEquals("Missing required field: 附件一.名單", exception.getMessage());
+    }
+
+    @Test
     void exportRejectsEmptyItineraryAttachment() throws Exception {
         Path inputJson = writeJson(root -> {
             ObjectNode attachment = (ObjectNode) root.get("附件二");

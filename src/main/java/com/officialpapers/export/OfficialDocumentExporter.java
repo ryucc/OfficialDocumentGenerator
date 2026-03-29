@@ -68,7 +68,7 @@ public class OfficialDocumentExporter {
     }
 
     private void requireNonEmpty(List<?> values, String fieldName) {
-        if (values.isEmpty()) {
+        if (values == null || values.isEmpty()) {
             throw new IllegalArgumentException("Missing required field: " + fieldName);
         }
     }

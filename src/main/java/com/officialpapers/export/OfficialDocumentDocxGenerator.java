@@ -39,51 +39,76 @@ class OfficialDocumentDocxGenerator {
      * @throws IOException if template loading or serialization fails
      */
     GeneratedFile generate(OfficialDocumentData data) throws IOException {
-        try (InputStream templateStream = openTemplate();
-             XWPFDocument document = new XWPFDocument(templateStream);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-
-            // Populate document with data
-            populateDocument(document, data);
-
-            // Serialize to bytes
-            document.write(outputStream);
-
-            // Build filename and return complete file
-            String fileName = buildOutputFilename(data);
-            return new GeneratedFile(fileName, outputStream.toByteArray());
+        try (XWPFDocument document = openDocument()) {
+            writeDocument(document, data);
+            return new GeneratedFile(buildOutputFilename(data), serializeDocument(document));
         }
     }
 
-    private void populateDocument(XWPFDocument document, OfficialDocumentData data) {
-        // Structure preparation
+    private XWPFDocument openDocument() throws IOException {
+        try (InputStream templateStream = openTemplate()) {
+            return new XWPFDocument(templateStream);
+        }
+    }
+
+    private void writeDocument(XWPFDocument document, OfficialDocumentData data) {
+        prepareTemplate(document);
+        HeadingSections headings = locateHeadings(document);
+        TableSections tables = locateTables(document);
+
+        writeHeadings(headings, data);
+        writeTables(tables, data);
+    }
+
+    private void prepareTemplate(XWPFDocument document) {
         trimTemplate(document);
         removeBlankParagraphsBeforeHeading(document, config.attachmentOneMarker());
         removeBlankParagraphsBeforeHeading(document, config.attachmentTwoMarker());
+    }
 
-        // Locate structural elements
-        XWPFParagraph titleParagraph = requireParagraph(document, 0);
-        XWPFParagraph attachmentOneHeading = requireParagraphContaining(document, config.attachmentOneMarker());
-        XWPFParagraph attachmentTwoHeading = requireParagraphContaining(document, config.attachmentTwoMarker());
+    private HeadingSections locateHeadings(XWPFDocument document) {
+        return new HeadingSections(
+                requireParagraph(document, 0),
+                requireParagraphContaining(document, config.attachmentOneMarker()),
+                requireParagraphContaining(document, config.attachmentTwoMarker())
+        );
+    }
 
-        // Write title and headings
-        setParagraphText(titleParagraph, safeText(data.title()));
-        setPageBreakBefore(attachmentOneHeading);
+    private void writeHeadings(HeadingSections headings, OfficialDocumentData data) {
+        setParagraphText(headings.title(), safeText(data.title()));
+        setPageBreakBefore(headings.attachmentOne());
         setParagraphText(
-                attachmentOneHeading,
+                headings.attachmentOne(),
                 valueOrDefault(data.inviteeAttachment().heading(), config.defaultAttachmentOneHeading())
         );
-        setPageBreakBefore(attachmentTwoHeading);
+        setPageBreakBefore(headings.attachmentTwo());
         setParagraphText(
-                attachmentTwoHeading,
+                headings.attachmentTwo(),
                 valueOrDefault(data.scheduleAttachment().heading(), config.defaultAttachmentTwoHeading())
         );
+    }
 
-        // Fill tables with data
-        fillMainApplicationTable(document.getTables().get(0), data.applicationForm());
-        fillInviteeTable(document.getTables().get(1), data.inviteeAttachment().entries());
-        fillFlightTable(document.getTables().get(2), data.scheduleAttachment().flights());
-        fillItineraryTable(document.getTables().get(3), data.scheduleAttachment().itinerary());
+    private TableSections locateTables(XWPFDocument document) {
+        return new TableSections(
+                requireTable(document, 0),
+                requireTable(document, 1),
+                requireTable(document, 2),
+                requireTable(document, 3)
+        );
+    }
+
+    private void writeTables(TableSections tables, OfficialDocumentData data) {
+        fillMainApplicationTable(tables.application(), data.applicationForm());
+        fillInviteeTable(tables.invitees(), data.inviteeAttachment().entries());
+        fillFlightTable(tables.flights(), data.scheduleAttachment().flights());
+        fillItineraryTable(tables.itinerary(), data.scheduleAttachment().itinerary());
+    }
+
+    private byte[] serializeDocument(XWPFDocument document) throws IOException {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            document.write(outputStream);
+            return outputStream.toByteArray();
+        }
     }
 
     private InputStream openTemplate() {
@@ -229,6 +254,13 @@ class OfficialDocumentDocxGenerator {
         throw new IllegalStateException("Expected paragraph containing marker: " + marker);
     }
 
+    private XWPFTable requireTable(XWPFDocument document, int tableIndex) {
+        if (document.getTables().size() <= tableIndex) {
+            throw new IllegalStateException("Expected table at index " + tableIndex);
+        }
+        return document.getTables().get(tableIndex);
+    }
+
     private void setParagraphText(XWPFParagraph paragraph, String text) {
         CTRPr templateRunProperties = copyRunProperties(paragraph);
         clearRuns(paragraph);
@@ -328,5 +360,20 @@ class OfficialDocumentDocxGenerator {
             return fallback;
         }
         return value;
+    }
+
+    private record HeadingSections(
+            XWPFParagraph title,
+            XWPFParagraph attachmentOne,
+            XWPFParagraph attachmentTwo
+    ) {
+    }
+
+    private record TableSections(
+            XWPFTable application,
+            XWPFTable invitees,
+            XWPFTable flights,
+            XWPFTable itinerary
+    ) {
     }
 }
