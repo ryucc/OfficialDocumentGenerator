@@ -8,8 +8,8 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
+import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
+import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -70,23 +70,44 @@ public class DynamoDbUploadedDocumentRepository implements UploadedDocumentRepos
     }
 
     @Override
-    public List<UploadedDocument> findAllByOwnerUserId(String ownerUserId) {
-        Map<String, AttributeValue> expressionAttributeValues = Map.of(
-                ":ownerUserId", AttributeValue.builder().s(ownerUserId).build()
+    public Optional<UploadedDocument> findByDocumentId(String documentId) {
+        List<UploadedDocument> documents = scanDocuments(
+                DOCUMENT_ID + " = :documentId",
+                Map.of(":documentId", AttributeValue.builder().s(documentId).build())
         );
+        if (documents.isEmpty()) {
+            return Optional.empty();
+        }
+        if (documents.size() > 1) {
+            throw new IllegalStateException("Expected at most one document for id " + documentId);
+        }
+        return Optional.of(documents.get(0));
+    }
+
+    @Override
+    public List<UploadedDocument> findAll() {
+        return scanDocuments(null, null);
+    }
+
+    private List<UploadedDocument> scanDocuments(
+            String filterExpression,
+            Map<String, AttributeValue> expressionAttributeValues
+    ) {
         List<Map<String, AttributeValue>> items = new ArrayList<>();
         Map<String, AttributeValue> exclusiveStartKey = null;
 
         do {
-            QueryRequest.Builder request = QueryRequest.builder()
+            ScanRequest.Builder request = ScanRequest.builder()
                     .tableName(tableName)
-                    .keyConditionExpression(OWNER_USER_ID + " = :ownerUserId")
-                    .expressionAttributeValues(expressionAttributeValues)
                     .consistentRead(true);
+            if (filterExpression != null) {
+                request.filterExpression(filterExpression)
+                        .expressionAttributeValues(expressionAttributeValues);
+            }
             if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
                 request.exclusiveStartKey(exclusiveStartKey);
             }
-            QueryResponse response = dynamoDbClient.query(request.build());
+            ScanResponse response = dynamoDbClient.scan(request.build());
             if (response.items() != null && !response.items().isEmpty()) {
                 items.addAll(response.items());
             }
