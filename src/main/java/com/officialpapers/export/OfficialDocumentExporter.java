@@ -13,7 +13,10 @@ public class OfficialDocumentExporter {
     private final OfficialDocumentDocxGenerator docxGenerator;
 
     public OfficialDocumentExporter() {
-        this(new ObjectMapper(), new OfficialDocumentDocxGenerator(OfficialDocumentGeneratorConfig.defaultConfig()));
+        OfficialDocumentGeneratorConfig config = OfficialDocumentGeneratorConfig.defaultConfig();
+        OfficialDocumentDocxWriter writer = new OfficialDocumentDocxWriter(config);
+        this.objectMapper = new ObjectMapper();
+        this.docxGenerator = new OfficialDocumentDocxGenerator(config, writer);
     }
 
     OfficialDocumentExporter(ObjectMapper objectMapper, OfficialDocumentDocxGenerator docxGenerator) {
