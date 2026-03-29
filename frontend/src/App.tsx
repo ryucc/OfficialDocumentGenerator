@@ -10,6 +10,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark'
   })
@@ -60,7 +61,8 @@ function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <button className="new-chat-btn">+ 新對話</button>
         <div className="sidebar-history">
           <div className="history-item">先前的對話</div>
@@ -71,6 +73,11 @@ function App() {
       </aside>
 
       <main className="main">
+        <button className="menu-btn" onClick={() => setSidebarOpen(true)} aria-label="開啟選單">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
         <div className="messages">
           {messages.length === 0 ? (
             <div className="empty-state">
@@ -123,8 +130,8 @@ function App() {
               placeholder="貼上電子郵件或描述您需要的公文..."
               rows={1}
             />
-            <button type="submit" className="send-btn" disabled={!input.trim() || isLoading}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <button type="submit" className="send-btn" disabled={!input.trim() || isLoading} aria-label="送出">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
