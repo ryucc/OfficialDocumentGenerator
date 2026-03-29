@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.di.DaggerLambdaComponent;
 import com.officialpapers.api.di.LambdaComponent;
@@ -132,7 +133,9 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
         validateStringField(body, "title", false);
         validateStringField(body, "content", false);
 
-        return readBody(body, DocumentInstructionUpdateRequest.class);
+        return new DocumentInstructionUpdateRequest()
+                .title(textValue(body, "title"))
+                .content(textValue(body, "content"));
     }
 
     private JsonNode readJson(APIGatewayProxyRequestEvent event) {
@@ -181,6 +184,11 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
         }
     }
 
+    private String textValue(JsonNode body, String fieldName) {
+        JsonNode field = body.get(fieldName);
+        return field == null || field.isNull() ? null : field.asText();
+    }
+
     private APIGatewayProxyResponseEvent jsonResponse(int statusCode, Object body) {
         try {
             return response(statusCode, objectMapper.writeValueAsString(body));
@@ -202,7 +210,9 @@ public class DocumentInstructionHandler implements RequestHandler<APIGatewayProx
     }
 
     private static ObjectMapper defaultObjectMapper() {
-        return new ObjectMapper().registerModule(new JavaTimeModule());
+        return new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
 }

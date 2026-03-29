@@ -1,6 +1,7 @@
 package com.officialpapers.api.di;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.persistence.DynamoDbInstructionMetadataRepository;
 import com.officialpapers.api.persistence.S3InstructionContentStore;
@@ -21,7 +22,9 @@ public interface LambdaModule {
     @Provides
     @Singleton
     static ObjectMapper provideObjectMapper() {
-        return new ObjectMapper().registerModule(new JavaTimeModule());
+        return new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     @Provides

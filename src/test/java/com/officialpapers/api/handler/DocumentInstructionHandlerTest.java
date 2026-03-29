@@ -1,6 +1,7 @@
 package com.officialpapers.api.handler;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.officialpapers.api.generated.model.DocumentInstruction;
@@ -56,6 +57,21 @@ class DocumentInstructionHandlerTest {
         assertEquals("Write formally", instruction.getContent());
         assertEquals(OffsetDateTime.parse("2026-03-29T10:15:30Z"), instruction.getCreatedAt());
         assertEquals(OffsetDateTime.parse("2026-03-29T10:15:30Z"), instruction.getUpdatedAt());
+    }
+
+    @Test
+    void createInstructionSerializesDateTimesAsStrings() throws Exception {
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withHttpMethod("POST")
+                .withBody("""
+                        {"title":"Scholarship","content":"Write formally"}
+                        """);
+
+        var response = handler.handleRequest(event, null);
+
+        JsonNode payload = objectMapper.readTree(response.getBody());
+        assertEquals(true, payload.get("createdAt").isTextual());
+        assertEquals(true, payload.get("updatedAt").isTextual());
     }
 
     @Test
@@ -183,6 +199,32 @@ class DocumentInstructionHandlerTest {
         assertEquals(400, response.getStatusCode());
         Map<?, ?> payload = objectMapper.readValue(response.getBody(), Map.class);
         assertEquals("content must be a string", payload.get("message"));
+    }
+
+    @Test
+    void updateInstructionAppliesProvidedTitle() throws Exception {
+        metadataRepository.save(new InstructionMetadata(
+                "66666666-6666-6666-6666-666666666666",
+                "Essay",
+                "instructions/66666666-6666-6666-6666-666666666666.txt",
+                "2026-03-29T10:15:30Z",
+                "2026-03-29T10:15:30Z"
+        ));
+        contentStore.put("instructions/66666666-6666-6666-6666-666666666666.txt", "Original");
+
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withHttpMethod("PUT")
+                .withPathParameters(Map.of("instructionId", "66666666-6666-6666-6666-666666666666"))
+                .withBody("""
+                        {"title":"Updated"}
+                        """);
+
+        var response = handler.handleRequest(event, null);
+
+        assertEquals(200, response.getStatusCode());
+        DocumentInstruction instruction = objectMapper.readValue(response.getBody(), DocumentInstruction.class);
+        assertEquals("Updated", instruction.getTitle());
+        assertEquals("Original", contentStore.get("instructions/66666666-6666-6666-6666-666666666666.txt"));
     }
 
     @Test
