@@ -7,12 +7,15 @@ A Spring Boot API for managing document-writing instructions.
 - **Java 17**
 - **Spring Boot 3.2.3**
 - **Spring Data JPA**
-- **Spring Security**
 - **H2 Database** (development)
 - **PostgreSQL** (production)
 - **Maven**
 - **SpringDoc OpenAPI** (API documentation)
 - **Lombok**
+
+## API Specification
+
+OpenAPI specification is located at `src/main/resources/openapi/openapi.yaml`
 
 ## Project Structure
 
