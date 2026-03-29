@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API_BASE_URL } from './config'
+import { authenticatedFetch } from './api'
 import './Projects.css'
 
 interface Project {
@@ -32,7 +33,7 @@ function Projects() {
         ? `${API_BASE_URL}/projects`
         : `${API_BASE_URL}/projects?status=${statusFilter}`
 
-      const response = await fetch(url)
+      const response = await authenticatedFetch(url)
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status} ${response.statusText}`)

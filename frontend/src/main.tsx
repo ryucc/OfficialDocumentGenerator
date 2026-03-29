@@ -1,12 +1,20 @@
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import './index.css'
 import Documents from './Documents.tsx'
 import Projects from './Projects.tsx'
+import Login from './Login.tsx'
+import ProtectedRoute from './ProtectedRoute.tsx'
+import { AuthProvider, useAuth } from './AuthContext.tsx'
 
 function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (theme: 'dark' | 'light') => void }) {
   const location = useLocation()
+  const { isAuthenticated, logout, user } = useAuth()
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <nav className="top-nav">
@@ -24,9 +32,25 @@ function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (t
           範例管理
         </Link>
       </div>
-      <button className="theme-toggle-nav" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <span style={{ fontSize: '14px', opacity: 0.8 }}>{user?.email}</span>
+        <button
+          onClick={() => logout()}
+          style={{
+            padding: '6px 12px',
+            fontSize: '14px',
+            cursor: 'pointer',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+            backgroundColor: 'transparent',
+          }}
+        >
+          登出
+        </button>
+        <button className="theme-toggle-nav" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </div>
     </nav>
   )
 }
@@ -41,12 +65,32 @@ function AppRouter() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  const { isAuthenticated } = useAuth()
+
   return (
     <>
       <Navigation theme={theme} setTheme={setTheme} />
       <Routes>
-        <Route path="/" element={<Projects />} />
-        <Route path="/documents" element={<Documents />} />
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+        />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Projects />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/documents"
+          element={
+            <ProtectedRoute>
+              <Documents />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </>
   )
@@ -55,7 +99,9 @@ function AppRouter() {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AppRouter />
+      <AuthProvider>
+        <AppRouter />
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

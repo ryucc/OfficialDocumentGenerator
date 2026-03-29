@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { API_BASE_URL } from './config'
+import { authenticatedFetch } from './api'
 import './Documents.css'
 
 interface Document {
@@ -27,7 +28,7 @@ function Documents() {
     try {
       setIsLoading(true)
       setError(null)
-      const response = await fetch(`${API_BASE_URL}/sample-documents`)
+      const response = await authenticatedFetch(`${API_BASE_URL}/sample-documents`)
 
       if (!response.ok) {
         throw new Error(`API Error: ${response.status} ${response.statusText}`)
@@ -69,7 +70,7 @@ function Documents() {
 
   const handleDownload = async (doc: Document) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/download-url`)
+      const response = await authenticatedFetch(`${API_BASE_URL}/sample-documents/${doc.id}/download-url`)
       if (!response.ok) {
         throw new Error('無法取得下載連結')
       }
@@ -93,7 +94,7 @@ function Documents() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/sample-documents/${doc.id}`, {
         method: 'DELETE',
       })
 
@@ -139,7 +140,7 @@ function Documents() {
       }
 
       // Step 1: Get presigned upload URL
-      const initResponse = await fetch(`${API_BASE_URL}/sample-documents`, {
+      const initResponse = await authenticatedFetch(`${API_BASE_URL}/sample-documents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +169,7 @@ function Documents() {
       }
 
       // Step 3: Mark as complete
-      const completeResponse = await fetch(`${API_BASE_URL}/sample-documents/${doc.id}/complete`, {
+      const completeResponse = await authenticatedFetch(`${API_BASE_URL}/sample-documents/${doc.id}/complete`, {
         method: 'POST',
       })
 

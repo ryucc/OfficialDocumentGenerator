@@ -38,8 +38,13 @@ Resources:
       StageName: Prod
       Cors:
         AllowOrigin: "'*'"
-        AllowHeaders: "'Content-Type'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt DocumentUserPool.Arn
 
   SampleDocumentFunction:
     Type: AWS::Serverless::Function
@@ -191,6 +196,9 @@ Resources:
       ClientName: !Sub official-doc-generator-${Stage}-client
       UserPoolId: !Ref DocumentUserPool
       GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
   # ---- Email Pipeline Resources ----
 
@@ -510,11 +518,14 @@ Outputs:
     Description: S3 bucket for uploaded source documents
     Value: !Ref UploadedDocumentBucket
   CognitoUserPoolId:
-    Description: Cognito user pool scaffold identifier
+    Description: Cognito user pool ID
     Value: !Ref DocumentUserPool
   CognitoUserPoolClientId:
-    Description: Cognito user pool client scaffold identifier
+    Description: Cognito user pool client ID
     Value: !Ref DocumentUserPoolClient
+  CognitoRegion:
+    Description: AWS region for Cognito
+    Value: !Ref AWS::Region
   EmailReceiptRuleSetName:
     Description: SES Receipt Rule Set name
     Value: !Ref EmailReceiptRuleSet
