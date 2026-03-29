@@ -24,6 +24,7 @@ class OpenApiContractTest {
         assertTrue(appTemplate.contains("Path: /api/v1/sample-documents"));
         assertTrue(appTemplate.contains("UPLOADED_DOCUMENT_METADATA_TABLE"));
         assertTrue(appTemplate.contains("UPLOADED_DOCUMENT_BUCKET"));
+        assertTrue(appTemplate.contains("- s3:ListBucket"));
         assertTrue(appTemplate.contains("CorsConfiguration:"));
         assertTrue(buildSpec.contains("infra/app-only.yaml"));
     }

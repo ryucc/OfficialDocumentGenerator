@@ -73,6 +73,15 @@ Resources:
                 - s3:PutObject
                 - s3:DeleteObject
               Resource: !Sub ${UploadedDocumentBucket.Arn}/*
+            - Sid: UploadedDocumentBucketListAccess
+              Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt UploadedDocumentBucket.Arn
+              Condition:
+                StringLike:
+                  s3:prefix:
+                    - sample-documents/*
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
