@@ -125,6 +125,11 @@ Resources:
                 - dynamodb:DeleteItem
                 - dynamodb:Scan
               Resource: !GetAtt UploadedDocumentTable.Arn
+            - Sid: UploadedDocumentBucketAccess
+              Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource: !GetAtt UploadedDocumentBucket.Arn
             - Sid: UploadedDocumentObjectAccess
               Effect: Allow
               Action:
