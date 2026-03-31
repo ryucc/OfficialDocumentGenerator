@@ -5,35 +5,20 @@ import boto3
 cognito_client = boto3.client('cognito-idp')
 
 
-def get_cognito_user_emails(user_pool_id):
-    """Fetch all registered user emails from Cognito"""
-    emails = set()
-    pagination_token = None
-
+def is_cognito_user(user_pool_id, email):
+    """Check if email is registered in Cognito"""
     try:
-        while True:
-            if pagination_token:
-                response = cognito_client.list_users(
-                    UserPoolId=user_pool_id,
-                    PaginationToken=pagination_token
-                )
-            else:
-                response = cognito_client.list_users(UserPoolId=user_pool_id)
+        response = cognito_client.list_users(
+            UserPoolId=user_pool_id,
+            Filter=f'email = "{email}"'
+        )
 
-            for user in response.get('Users', []):
-                for attr in user.get('Attributes', []):
-                    if attr['Name'] == 'email':
-                        emails.add(attr['Value'].lower())
-
-            pagination_token = response.get('PaginationToken')
-            if not pagination_token:
-                break
+        users = response.get('Users', [])
+        return len(users) > 0
 
     except Exception as e:
-        print(f"Error fetching Cognito users: {str(e)}")
+        print(f"Error checking Cognito user: {str(e)}")
         raise
-
-    return emails
 
 
 def lambda_handler(event, context):
@@ -74,12 +59,8 @@ def lambda_handler(event, context):
         print(f"Authentication failed for {sender}, rejecting email")
         return {'disposition': 'STOP_RULE'}
 
-    # Get allowed senders from Cognito
-    allowed_emails = get_cognito_user_emails(user_pool_id)
-    print(f"Cognito registered emails: {allowed_emails}")
-
     # Check if sender is registered in Cognito
-    if sender not in allowed_emails:
+    if not is_cognito_user(user_pool_id, sender):
         print(f"Sender {sender} not registered in Cognito, rejecting email")
         return {'disposition': 'STOP_RULE'}
 
