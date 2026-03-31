@@ -267,7 +267,7 @@ Resources:
 
   # ---- Email Pipeline Resources ----
 
-  # Lambda function to filter incoming emails by allowlist
+  # Lambda function to filter incoming emails by Cognito user list
   EmailFilterFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -278,12 +278,17 @@ Resources:
       Timeout: 30
       Environment:
         Variables:
-          ALLOWED_SENDERS: !Join [',', !Ref AllowedEmailSenders]
+          USER_POOL_ID: !Ref DocumentUserPool
           EMAIL_BUCKET: !Ref UploadedDocumentBucket
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref UploadedDocumentBucket
         - Statement:
+            - Sid: CognitoListUsersAccess
+              Effect: Allow
+              Action:
+                - cognito-idp:ListUsers
+              Resource: !GetAtt DocumentUserPool.Arn
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
