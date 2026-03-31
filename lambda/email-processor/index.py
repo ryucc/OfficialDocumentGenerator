@@ -8,12 +8,13 @@ from uuid import uuid4
 
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
+ses = boto3.client('ses')
 
 
-def extract_email_subject(bucket, key):
+def extract_email_metadata(bucket, key):
     """
-    Fetch email from S3 and extract the subject line.
-    Returns the subject or a default value if extraction fails.
+    Fetch email from S3 and extract subject and sender.
+    Returns a dict with subject and sender, or defaults if extraction fails.
     """
     try:
         response = s3.get_object(Bucket=bucket, Key=key)
@@ -22,14 +23,55 @@ def extract_email_subject(bucket, key):
         # Parse email
         msg = email.message_from_bytes(email_content, policy=policy.default)
         subject = msg.get('Subject', 'Untitled Email')
+        sender = msg.get('From', '')
 
         # Decode subject if needed
         if subject:
-            return str(subject).strip()
-        return 'Untitled Email'
+            subject = str(subject).strip()
+        else:
+            subject = 'Untitled Email'
+
+        return {
+            'subject': subject,
+            'sender': sender
+        }
     except Exception as e:
-        print(f"Error extracting email subject: {str(e)}")
-        return 'Untitled Email'
+        print(f"Error extracting email metadata: {str(e)}")
+        return {
+            'subject': 'Untitled Email',
+            'sender': ''
+        }
+
+
+def send_success_reply(to_email, original_subject):
+    """
+    Send a success confirmation reply to the sender.
+    """
+    sender_email = os.environ.get('SENDER_EMAIL', 'ai@gongwengpt.click')
+
+    try:
+        response = ses.send_email(
+            Source=sender_email,
+            Destination={'ToAddresses': [to_email]},
+            Message={
+                'Subject': {
+                    'Data': f'Re: {original_subject}',
+                    'Charset': 'UTF-8'
+                },
+                'Body': {
+                    'Text': {
+                        'Data': 'Success',
+                        'Charset': 'UTF-8'
+                    }
+                }
+            }
+        )
+        print(f"Sent success reply to {to_email}, MessageId: {response['MessageId']}")
+        return True
+    except Exception as e:
+        print(f"Error sending reply to {to_email}: {str(e)}")
+        # Don't raise - we don't want to fail the entire processing if reply fails
+        return False
 
 
 def lambda_handler(event, context):
@@ -58,9 +100,11 @@ def lambda_handler(event, context):
 
                 print(f"Processing email from S3: s3://{bucket}/{key}")
 
-                # Extract email subject
-                email_subject = extract_email_subject(bucket, key)
-                print(f"Email subject: {email_subject}")
+                # Extract email metadata
+                email_metadata = extract_email_metadata(bucket, key)
+                email_subject = email_metadata['subject']
+                email_sender = email_metadata['sender']
+                print(f"Email subject: {email_subject}, sender: {email_sender}")
 
                 # Generate project ID
                 project_id = str(uuid4())
@@ -80,6 +124,10 @@ def lambda_handler(event, context):
                 table.put_item(Item=item)
 
                 print(f"Created project {project_id} for email {key}")
+
+                # Send success reply
+                if email_sender:
+                    send_success_reply(email_sender, email_subject)
 
         except Exception as e:
             print(f"Error processing message: {str(e)}")

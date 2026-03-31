@@ -379,6 +379,7 @@ Resources:
       Environment:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
+          SENDER_EMAIL: !Sub ai@${EmailDomainName}
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
@@ -387,6 +388,12 @@ Resources:
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailProcessingQueue.QueueName
         - Statement:
+            - Sid: SESSendEmailAccess
+              Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: '*'
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
