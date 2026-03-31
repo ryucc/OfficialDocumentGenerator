@@ -3,6 +3,7 @@ import os
 import boto3
 import email
 from email import policy
+from email.utils import parseaddr
 from datetime import datetime
 from uuid import uuid4
 
@@ -23,7 +24,7 @@ def extract_email_metadata(bucket, key):
         # Parse email
         msg = email.message_from_bytes(email_content, policy=policy.default)
         subject = msg.get('Subject', 'Untitled Email')
-        sender = msg.get('From', '')
+        sender_header = msg.get('From', '')
 
         # Decode subject if needed
         if subject:
@@ -31,9 +32,13 @@ def extract_email_metadata(bucket, key):
         else:
             subject = 'Untitled Email'
 
+        # Extract email address from "Name <email@domain.com>" format
+        sender_name, sender_email = parseaddr(sender_header)
+        sender_email = sender_email.strip() if sender_email else ''
+
         return {
             'subject': subject,
-            'sender': sender
+            'sender': sender_email
         }
     except Exception as e:
         print(f"Error extracting email metadata: {str(e)}")
