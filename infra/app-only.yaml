@@ -319,6 +319,8 @@ Resources:
           AttributeType: S
         - AttributeName: status
           AttributeType: S
+        - AttributeName: sesMessageId
+          AttributeType: S
       KeySchema:
         - AttributeName: projectId
           KeyType: HASH
@@ -329,6 +331,12 @@ Resources:
               KeyType: HASH
             - AttributeName: projectId
               KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SesMessageIdIndex
+          KeySchema:
+            - AttributeName: sesMessageId
+              KeyType: HASH
           Projection:
             ProjectionType: ALL
 
