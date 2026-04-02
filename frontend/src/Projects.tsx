@@ -18,20 +18,16 @@ function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-
   useEffect(() => {
     fetchProjects()
-  }, [statusFilter])
+  }, [])
 
   const fetchProjects = async () => {
     try {
       setIsLoading(true)
       setError(null)
 
-      const url = statusFilter === 'all'
-        ? `${API_BASE_URL}/projects`
-        : `${API_BASE_URL}/projects?status=${statusFilter}`
+      const url = `${API_BASE_URL}/projects`
 
       const response = await authenticatedFetch(url)
 
@@ -115,18 +111,6 @@ function Projects() {
     <div className="projects-container">
       <div className="projects-header">
         <h1>郵件專案</h1>
-        <div className="filter-controls">
-          <label>狀態篩選：</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="status-filter"
-          >
-            <option value="all">全部</option>
-            <option value="in_progress">處理中</option>
-            <option value="finished">已完成</option>
-          </select>
-        </div>
       </div>
 
       {projects.length === 0 ? (
@@ -142,7 +126,6 @@ function Projects() {
               <th>生成公文</th>
               <th>狀態</th>
               <th>建立時間</th>
-              <th>更新時間</th>
             </tr>
           </thead>
           <tbody>
@@ -167,9 +150,6 @@ function Projects() {
                 </td>
                 <td className="project-date">
                   {formatDate(project.createdAt)}
-                </td>
-                <td className="project-date">
-                  {formatDate(project.updatedAt)}
                 </td>
               </tr>
             ))}

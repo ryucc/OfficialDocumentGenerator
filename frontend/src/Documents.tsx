@@ -232,7 +232,6 @@ function Documents() {
             <tr>
               <th>文件名稱</th>
               <th>建立時間</th>
-              <th>更新時間</th>
               <th>大小</th>
               <th>操作</th>
             </tr>
@@ -247,9 +246,6 @@ function Documents() {
                 </td>
                 <td className="doc-date">
                   {formatDate(doc.createdAt)}
-                </td>
-                <td className="doc-date">
-                  {formatDate(doc.updatedAt)}
                 </td>
                 <td className="doc-size">
                   {formatFileSize(doc.sizeBytes)}
