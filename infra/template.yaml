@@ -113,6 +113,9 @@ Resources:
       ServiceRole: !GetAtt BuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location: !Sub ${ArtifactBucket}/codebuild-cache
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL

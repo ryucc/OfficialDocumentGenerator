@@ -1,7 +1,10 @@
-import { fetchAuthSession } from 'aws-amplify/auth'
+const IS_MOCK = import.meta.env.VITE_MOCK === 'true'
 
 export async function getAuthHeaders(): Promise<HeadersInit> {
+  if (IS_MOCK) return {}
+
   try {
+    const { fetchAuthSession } = await import('aws-amplify/auth')
     const session = await fetchAuthSession()
     const idToken = session.tokens?.idToken?.toString()
 

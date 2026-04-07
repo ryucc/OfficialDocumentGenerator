@@ -5,8 +5,14 @@ import './index.css'
 import Documents from './Documents.tsx'
 import Projects from './Projects.tsx'
 import Login from './Login.tsx'
+import Welcome from './Welcome.tsx'
 import ProtectedRoute from './ProtectedRoute.tsx'
 import { AuthProvider, useAuth } from './AuthContext.tsx'
+
+if (import.meta.env.VITE_MOCK === 'true') {
+  const { setupMockApi } = await import('./mockApi')
+  setupMockApi()
+}
 
 function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (theme: 'dark' | 'light') => void }) {
   const location = useLocation()
@@ -71,6 +77,10 @@ function AppRouter() {
     <>
       <Navigation theme={theme} setTheme={setTheme} />
       <Routes>
+        <Route
+          path="/welcome"
+          element={isAuthenticated ? <Navigate to="/" replace /> : <Welcome />}
+        />
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
