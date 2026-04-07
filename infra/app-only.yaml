@@ -109,8 +109,12 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub sample-document-${Stage}
-      Handler: com.officialpapers.api.handler.SampleDocumentHandler
-      CodeUri: ../build/distributions/lambda.zip
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      CodeUri: ../lambda/sample-documents-api/target/lambda/sample-documents-api/bootstrap.zip
       Environment:
         Variables:
           UPLOADED_DOCUMENT_METADATA_TABLE: !Ref UploadedDocumentTable

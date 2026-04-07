@@ -4,11 +4,35 @@ phases:
   install:
     runtime-versions:
       java: corretto21
+    commands:
+      # Install Rust toolchain (cached after first build)
+      - |
+        if [ ! -f "$HOME/.cargo/bin/rustup" ]; then
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+        fi
+      - source $HOME/.cargo/env
+      - |
+        if ! command -v cargo-lambda &> /dev/null; then
+          pip3 install ziglang
+          cargo install cargo-lambda
+        fi
   build:
     commands:
+      # Build Java Lambda
       - chmod +x gradlew
       - ./gradlew clean build
+      # Build Rust Lambda
+      - cd lambda/sample-documents-api && cargo lambda build --release --output-format zip && cd ../..
+      # Package SAM template
       - sam package --template-file infra/app-only.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
+
+cache:
+  paths:
+    - $HOME/.cargo/**/*
+    - $HOME/.rustup/**/*
+    - lambda/sample-documents-api/target/**/*
+    - $HOME/.gradle/caches/**/*
+    - $HOME/.gradle/wrapper/**/*
 
 artifacts:
   files:
