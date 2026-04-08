@@ -392,7 +392,7 @@ Resources:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
           SENDER_EMAIL: !Sub ai@${EmailDomainName}
-          CLAUDE_MODEL_ID: anthropic.claude-sonnet-4-20250514-v1:0
+          CLAUDE_MODEL_ID: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/ap-northeast-1.anthropic.claude-haiku-4-5-20251001-v1:0
           DOCUMENT_GENERATOR_FUNCTION: !Ref DocumentGeneratorFunction
       Policies:
         - DynamoDBCrudPolicy:
@@ -412,7 +412,9 @@ Resources:
               Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.*
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.*
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/ap-northeast-1.anthropic.*
             - Sid: InvokeDocumentGenerator
               Effect: Allow
               Action:
