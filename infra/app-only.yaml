@@ -383,11 +383,13 @@ Resources:
       Runtime: python3.12
       Handler: index.lambda_handler
       CodeUri: ../lambda/email-processor
-      Timeout: 60
+      Timeout: 120
       Environment:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
           SENDER_EMAIL: !Sub ai@${EmailDomainName}
+          CLAUDE_MODEL_ID: anthropic.claude-sonnet-4-20250514-v1:0
+          DOCUMENT_GENERATOR_FUNCTION: !Ref DocumentGeneratorFunction
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
@@ -402,6 +404,16 @@ Resources:
                 - ses:SendEmail
                 - ses:SendRawEmail
               Resource: '*'
+            - Sid: BedrockInvokeAccess
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.*
+            - Sid: InvokeDocumentGenerator
+              Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+              Resource: !GetAtt DocumentGeneratorFunction.Arn
             - Sid: CloudWatchLogsAccess
               Effect: Allow
               Action:
@@ -415,6 +427,33 @@ Resources:
           Properties:
             Queue: !GetAtt EmailProcessingQueue.Arn
             BatchSize: 10
+
+  # Lambda function for document generation (Java)
+  DocumentGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub document-generator-${Stage}
+      Handler: com.officialpapers.export.DocumentGeneratorHandler
+      CodeUri: ../build/distributions/lambda.zip
+      Timeout: 60
+      MemorySize: 1024
+      Environment:
+        Variables:
+          GENERATED_DOCUMENT_BUCKET: !Ref UploadedDocumentBucket
+      Policies:
+        - Statement:
+            - Sid: S3WriteAccess
+              Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/generated-documents/*
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/document-generator-${Stage}:*
 
   # Lambda function for Projects API
   ProjectsApiFunction:
