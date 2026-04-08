@@ -462,14 +462,17 @@ Resources:
                 - logs:PutLogEvents
               Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/document-generator-${Stage}:*
 
-  # Lambda function for Projects API
+  # Lambda function for Projects API (Rust)
   ProjectsApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub projects-api-${Stage}
-      Runtime: python3.12
-      Handler: index.lambda_handler
-      CodeUri: ../lambda/projects-api
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      CodeUri: ../lambda/projects-api-rust/target/lambda/projects-api/bootstrap.zip
       Timeout: 30
       Environment:
         Variables:
