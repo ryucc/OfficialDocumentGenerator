@@ -15,7 +15,7 @@ from uuid import uuid4
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
-bedrock = boto3.client('bedrock-runtime')
+bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'))
 
 CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-20250514-v1:0')
 
