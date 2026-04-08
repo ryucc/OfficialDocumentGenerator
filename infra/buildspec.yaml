@@ -11,9 +11,9 @@ phases:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
         fi
       - source $HOME/.cargo/env
+      - pip3 install ziglang
       - |
         if ! command -v cargo-lambda &> /dev/null; then
-          pip3 install ziglang
           cargo install cargo-lambda
         fi
   build:
