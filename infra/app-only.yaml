@@ -344,6 +344,21 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  # DynamoDB table for document generation skills (scripts + schemas + instructions)
+  SkillsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub skills-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: skillId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: skillId
+          KeyType: HASH
+      # DynamoDB fields: skillId, name, description, owner, language, version, schemaJson, createdAt, updatedAt
+      # S3 content at skills/{skillId}/: script.* (docx generator), instructions.md (AI prompt)
+
   # Dead Letter Queue for failed email processing
   EmailProcessingDLQ:
     Type: AWS::SQS::Queue
@@ -675,3 +690,6 @@ Outputs:
   EmailProcessorFunctionName:
     Description: Lambda function for processing emails
     Value: !Ref EmailProcessorFunction
+  SkillsTableName:
+    Description: DynamoDB table for document generation skills
+    Value: !Ref SkillsTable
