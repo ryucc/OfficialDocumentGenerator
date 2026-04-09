@@ -424,14 +424,27 @@ Resources:
           CLAUDE_MODEL_ID: us.anthropic.claude-haiku-4-5-20251001-v1:0
           BEDROCK_REGION: us-east-1
           DOCUMENT_GENERATOR_FUNCTION: !Ref DocumentGeneratorFunction
+          USER_POOL_ID: !Ref DocumentUserPool
+          USERS_TABLE: !Ref UsersTable
+          SKILLS_TABLE: !Ref SkillsTable
+          SKILLS_BUCKET: !Ref UploadedDocumentBucket
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref SkillsTable
         - S3ReadPolicy:
             BucketName: !Ref UploadedDocumentBucket
         - SQSPollerPolicy:
             QueueName: !GetAtt EmailProcessingQueue.QueueName
         - Statement:
+            - Sid: CognitoListUsers
+              Effect: Allow
+              Action:
+                - cognito-idp:ListUsers
+              Resource: !GetAtt DocumentUserPool.Arn
             - Sid: SESSendEmailAccess
               Effect: Allow
               Action:
