@@ -158,7 +158,7 @@ const routes: Array<{ match: (url: URL) => boolean; handler: RouteHandler }> = [
       if (options?.method === 'DELETE') {
         return jsonResponse({ success: true })
       }
-      const id = url.pathname.split('/').pop()
+      const id = _url.pathname.split('/').pop()
       const doc = mockDocuments.find((d) => d.id === id) || mockDocuments[0]
       return jsonResponse(doc)
     },
