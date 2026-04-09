@@ -125,6 +125,24 @@ const routes: Array<{ match: (url: URL) => boolean; handler: RouteHandler }> = [
     handler: () => jsonResponse({ items: mockSkills, count: mockSkills.length }),
   },
   {
+    match: (url) => /\/skills\/[^/]+$/.test(url.pathname) && !url.pathname.includes('/users/'),
+    handler: (url) => {
+      const skillId = url.pathname.split('/').pop()
+      const skill = mockSkills.find((s) => s.skillId === skillId)
+      if (!skill) return jsonResponse({ error: 'Not found' }, 404)
+      return jsonResponse({
+        ...skill,
+        language: 'java',
+        version: '1.0.0',
+        schemaJson: '{"標題":"string","申請表":{"申請單位":"string","緣由":"string"}}',
+        instructionsMd: '# 填寫說明\n\n請從郵件中擷取以下資訊：\n\n- **標題**：公文標題\n- **申請單位**：申請單位名稱\n- **緣由**：申請原因',
+        instructionsHtml: '<h1>填寫說明</h1><p>請從郵件中擷取以下資訊：</p><ul><li><strong>標題</strong>：公文標題</li><li><strong>申請單位</strong>：申請單位名稱</li><li><strong>緣由</strong>：申請原因</li></ul>',
+        createdAt: '2026-04-08T00:00:00Z',
+        updatedAt: '2026-04-08T00:00:00Z',
+      })
+    },
+  },
+  {
     match: (url) => /\/users\/[^/]+\/skills\/[^/]+$/.test(url.pathname),
     handler: (_url, options) => {
       const parts = _url.pathname.split('/')

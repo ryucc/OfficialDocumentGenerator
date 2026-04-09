@@ -6,6 +6,7 @@ import Documents from './Documents.tsx'
 import Projects from './Projects.tsx'
 import Marketplace from './Marketplace.tsx'
 import InstalledSkills from './InstalledSkills.tsx'
+import SkillDetail from './SkillDetail.tsx'
 import Login from './Login.tsx'
 import Welcome from './Welcome.tsx'
 import ProtectedRoute from './ProtectedRoute.tsx'
@@ -120,6 +121,14 @@ function AppRouter() {
           element={
             <ProtectedRoute>
               <InstalledSkills />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/skills/:skillId"
+          element={
+            <ProtectedRoute>
+              <SkillDetail />
             </ProtectedRoute>
           }
         />
