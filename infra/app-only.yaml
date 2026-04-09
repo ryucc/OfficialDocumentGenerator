@@ -359,6 +359,20 @@ Resources:
       # DynamoDB fields: skillId, name, description, owner, language, version, schemaJson, createdAt, updatedAt
       # S3 content at skills/{skillId}/: script.* (docx generator), instructions.md (AI prompt)
 
+  # DynamoDB table for user profiles and installed skills
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub users-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      # DynamoDB fields: userId (Cognito sub), displayName, installedSkills (string set)
+
   # Dead Letter Queue for failed email processing
   EmailProcessingDLQ:
     Type: AWS::SQS::Queue
@@ -727,3 +741,6 @@ Outputs:
   SkillsTableName:
     Description: DynamoDB table for document generation skills
     Value: !Ref SkillsTable
+  UsersTableName:
+    Description: DynamoDB table for user profiles
+    Value: !Ref UsersTable
