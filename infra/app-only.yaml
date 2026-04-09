@@ -511,6 +511,40 @@ Resources:
             Path: /api/v1/projects
             Method: GET
 
+  # Lambda function for Skills API (Rust)
+  SkillsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub skills-api-${Stage}
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      CodeUri: ../lambda/skills-api/target/lambda/skills-api/bootstrap.zip
+      Timeout: 30
+      Environment:
+        Variables:
+          SKILLS_TABLE: !Ref SkillsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref SkillsTable
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/skills-api-${Stage}:*
+      Events:
+        ListSkills:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/skills
+            Method: GET
+
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
     Type: AWS::SES::ReceiptRuleSet
