@@ -24,6 +24,7 @@ phases:
       # Build Rust Lambdas
       - cd lambda/sample-documents-api && cargo lambda build --release --output-format zip && cd ../..
       - cd lambda/projects-api-rust && cargo lambda build --release --output-format zip && cd ../..
+      - cd lambda/skills-api && cargo lambda build --release --output-format zip && cd ../..
       # Package SAM template
       - sam package --template-file infra/app-only.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
 
@@ -33,6 +34,7 @@ cache:
     - $HOME/.rustup/**/*
     - lambda/sample-documents-api/target/**/*
     - lambda/projects-api-rust/target/**/*
+    - lambda/skills-api/target/**/*
     - $HOME/.gradle/caches/**/*
     - $HOME/.gradle/wrapper/**/*
 

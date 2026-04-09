@@ -359,6 +359,20 @@ Resources:
       # DynamoDB fields: skillId, name, description, owner, language, version, schemaJson, createdAt, updatedAt
       # S3 content at skills/{skillId}/: script.* (docx generator), instructions.md (AI prompt)
 
+  # DynamoDB table for user profiles and installed skills
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub users-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      # DynamoDB fields: userId (Cognito sub), displayName, installedSkills (string set)
+
   # Dead Letter Queue for failed email processing
   EmailProcessingDLQ:
     Type: AWS::SQS::Queue
@@ -509,6 +523,40 @@ Resources:
           Properties:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/projects
+            Method: GET
+
+  # Lambda function for Skills API (Rust)
+  SkillsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub skills-api-${Stage}
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      CodeUri: ../lambda/skills-api/target/lambda/skills-api/bootstrap.zip
+      Timeout: 30
+      Environment:
+        Variables:
+          SKILLS_TABLE: !Ref SkillsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref SkillsTable
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/skills-api-${Stage}:*
+      Events:
+        ListSkills:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/skills
             Method: GET
 
   # SES Receipt Rule Set
@@ -693,3 +741,6 @@ Outputs:
   SkillsTableName:
     Description: DynamoDB table for document generation skills
     Value: !Ref SkillsTable
+  UsersTableName:
+    Description: DynamoDB table for user profiles
+    Value: !Ref UsersTable
