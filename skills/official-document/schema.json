@@ -1,0 +1,65 @@
+{
+  "輸出檔名": "string",
+  "標題": "string",
+  "申請表": {
+    "申請單位": "string",
+    "申請日期": "string",
+    "申請文號": "string",
+    "對象勾選列": "string",
+    "緣由": "string",
+    "市場屬性": "string",
+    "方式列": ["string"],
+    "人數": "string",
+    "出發地": "string",
+    "時間": "string",
+    "年度計畫": "string",
+    "申請單位經費列": ["string"],
+    "申請單位預估金額列": ["string"],
+    "申請單位分攤比例": "string",
+    "其他來源列": ["string"],
+    "其他來源預估金額列": ["string"],
+    "其他來源分攤比例": "string",
+    "本署支應列": ["string"],
+    "本署支應預估金額列": ["string"],
+    "本署支應分攤比例": "string",
+    "超過五成理由": "string",
+    "預期效益列": ["string"],
+    "預定核銷時間": "string",
+    "預定成果報核時間": "string",
+    "備註列": ["string"],
+    "附件資料列": ["string"]
+  },
+  "附件一": {
+    "標題": "string",
+    "名單": [
+      {
+        "編號": "string",
+        "姓名": "string",
+        "性別": "string",
+        "職稱": "string",
+        "單位名稱": "string",
+        "邀訪紀錄": "string",
+        "成效評估": "string",
+        "備註": "string"
+      }
+    ]
+  },
+  "附件二": {
+    "標題": "string",
+    "航班資訊": [
+      {
+        "航班資訊": "string",
+        "班機號碼": "string",
+        "出發時間": "string",
+        "抵達時間": "string"
+      }
+    ],
+    "行程表": [
+      {
+        "日期列": ["string"],
+        "建議行程列": ["string"],
+        "住宿列": ["string"]
+      }
+    ]
+  }
+}
