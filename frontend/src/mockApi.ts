@@ -75,6 +75,18 @@ const mockDocuments = [
   },
 ]
 
+const mockSkills = [
+  {
+    skillId: 'official-document-v1',
+    displayName: '邀訪案撰寫',
+    name: '公文申請表',
+    description: '政府公文申請表產生器，包含申請表、受邀人名單附件、行程表附件',
+    owner: 'Hsieh Chang-Ming',
+  },
+]
+
+const mockInstalledSkills = new Set<string>(['official-document-v1'])
+
 type RouteHandler = (url: URL, options?: RequestInit) => Response
 
 const routes: Array<{ match: (url: URL) => boolean; handler: RouteHandler }> = [
@@ -107,6 +119,30 @@ const routes: Array<{ match: (url: URL) => boolean; handler: RouteHandler }> = [
       }
       return jsonResponse({ items: mockDocuments })
     },
+  },
+  {
+    match: (url) => url.pathname.endsWith('/skills') && !url.pathname.includes('/users/'),
+    handler: () => jsonResponse({ items: mockSkills, count: mockSkills.length }),
+  },
+  {
+    match: (url) => /\/users\/[^/]+\/skills\/[^/]+$/.test(url.pathname),
+    handler: (_url, options) => {
+      const parts = _url.pathname.split('/')
+      const skillId = parts[parts.length - 1]
+      if (options?.method === 'PUT') {
+        mockInstalledSkills.add(skillId)
+        return jsonResponse({ message: `Skill ${skillId} installed` })
+      }
+      if (options?.method === 'DELETE') {
+        mockInstalledSkills.delete(skillId)
+        return jsonResponse({ message: `Skill ${skillId} uninstalled` })
+      }
+      return jsonResponse({ message: 'Not found' }, 404)
+    },
+  },
+  {
+    match: (url) => /\/users\/[^/]+\/skills$/.test(url.pathname),
+    handler: () => jsonResponse({ installedSkills: Array.from(mockInstalledSkills) }),
   },
   {
     match: (url) => /\/sample-documents\/[^/]+\/download-url$/.test(url.pathname),

@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import './index.css'
 import Documents from './Documents.tsx'
 import Projects from './Projects.tsx'
+import Marketplace from './Marketplace.tsx'
+import InstalledSkills from './InstalledSkills.tsx'
 import Login from './Login.tsx'
 import Welcome from './Welcome.tsx'
 import ProtectedRoute from './ProtectedRoute.tsx'
@@ -36,6 +38,18 @@ function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (t
           className={`nav-link ${location.pathname === '/documents' ? 'active' : ''}`}
         >
           範例管理
+        </Link>
+        <Link
+          to="/skills"
+          className={`nav-link ${location.pathname === '/skills' ? 'active' : ''}`}
+        >
+          已安裝技能
+        </Link>
+        <Link
+          to="/marketplace"
+          className={`nav-link ${location.pathname === '/marketplace' ? 'active' : ''}`}
+        >
+          技能市集
         </Link>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -98,6 +112,22 @@ function AppRouter() {
           element={
             <ProtectedRoute>
               <Documents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/skills"
+          element={
+            <ProtectedRoute>
+              <InstalledSkills />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/marketplace"
+          element={
+            <ProtectedRoute>
+              <Marketplace />
             </ProtectedRoute>
           }
         />
