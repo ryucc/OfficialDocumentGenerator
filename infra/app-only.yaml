@@ -559,6 +559,52 @@ Resources:
             Path: /api/v1/skills
             Method: GET
 
+  # Lambda function for User Skills API (Rust)
+  UserSkillsApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub user-skills-api-${Stage}
+      Runtime: provided.al2023
+      Handler: bootstrap
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      CodeUri: ../lambda/user-skills-api/target/lambda/user-skills-api/bootstrap.zip
+      Timeout: 30
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - Statement:
+            - Sid: CloudWatchLogsAccess
+              Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/user-skills-api-${Stage}:*
+      Events:
+        ListUserSkills:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/users/{userId}/skills
+            Method: GET
+        InstallSkill:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/users/{userId}/skills/{skillId}
+            Method: PUT
+        UninstallSkill:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/users/{userId}/skills/{skillId}
+            Method: DELETE
+
   # SES Receipt Rule Set
   EmailReceiptRuleSet:
     Type: AWS::SES::ReceiptRuleSet
