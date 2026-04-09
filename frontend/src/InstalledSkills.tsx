@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { API_BASE_URL } from './config'
 import { authenticatedFetch } from './api'
 import { useAuth } from './AuthContext'
@@ -114,7 +115,7 @@ function InstalledSkills() {
           <tbody>
             {skills.map((skill) => (
               <tr key={skill.skillId}>
-                <td className="skill-name">{skill.displayName || skill.name}</td>
+                <td className="skill-name"><Link to={`/skills/${skill.skillId}`} className="skill-link">{skill.displayName || skill.name}</Link></td>
                 <td className="skill-owner">{skill.owner}</td>
                 <td className="skill-description">{skill.description}</td>
                 <td className="skill-action">

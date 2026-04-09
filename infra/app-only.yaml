@@ -553,9 +553,12 @@ Resources:
       Environment:
         Variables:
           SKILLS_TABLE: !Ref SkillsTable
+          SKILLS_BUCKET: !Ref UploadedDocumentBucket
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref SkillsTable
+        - S3ReadPolicy:
+            BucketName: !Ref UploadedDocumentBucket
         - Statement:
             - Sid: CloudWatchLogsAccess
               Effect: Allow
@@ -570,6 +573,12 @@ Resources:
           Properties:
             RestApiId: !Ref DocumentApi
             Path: /api/v1/skills
+            Method: GET
+        GetSkill:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DocumentApi
+            Path: /api/v1/skills/{skillId}
             Method: GET
 
   # Lambda function for User Skills API (Rust)

@@ -112,6 +112,119 @@
   border-color: #ef4444;
 }
 
+.skill-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.skill-link:hover {
+  text-decoration: underline;
+}
+
+/* Detail page */
+
+.skill-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.skill-detail-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--text);
+}
+
+.skill-meta {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.skill-detail-description {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.skill-detail-section {
+  margin-bottom: 2rem;
+}
+
+.skill-detail-section h2 {
+  font-size: 1.3rem;
+  color: var(--text);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.skill-instructions {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.skill-instructions h1,
+.skill-instructions h2,
+.skill-instructions h3 {
+  color: var(--text);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.skill-instructions h1:first-child,
+.skill-instructions h2:first-child {
+  margin-top: 0;
+}
+
+.skill-instructions ul,
+.skill-instructions ol {
+  padding-left: 1.5rem;
+}
+
+.skill-instructions li {
+  margin-bottom: 0.3rem;
+}
+
+.skill-instructions code {
+  background: var(--hover);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.skill-instructions pre {
+  background: var(--hover);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.skill-instructions pre code {
+  background: none;
+  padding: 0;
+}
+
+.skill-schema {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
 @media (max-width: 768px) {
   .skills-table {
     font-size: 0.85rem;
