@@ -18,6 +18,7 @@ struct AppState {
 struct Skill {
     skill_id: String,
     name: String,
+    display_name: String,
     description: String,
     owner: String,
     language: String,
@@ -73,6 +74,7 @@ fn from_dynamo_item(item: &HashMap<String, AttributeValue>) -> Option<Skill> {
     Some(Skill {
         skill_id: item.get("skillId")?.as_s().ok()?.clone(),
         name: str_field(item, "name"),
+        display_name: str_field(item, "displayName"),
         description: str_field(item, "description"),
         owner: str_field(item, "owner"),
         language: str_field(item, "language"),
