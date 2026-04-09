@@ -15,6 +15,7 @@ from uuid import uuid4
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
+cognito = boto3.client('cognito-idp')
 bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'))
 
 CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-20250514-v1:0')
@@ -23,6 +24,90 @@ CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-2
 def load_prompt(name: str) -> str:
     path = Path(__file__).parent / 'prompts' / f'{name}.md'
     return path.read_text(encoding='utf-8')
+
+
+def get_cognito_user_id(email):
+    """Look up the Cognito userId (sub) for a given email."""
+    user_pool_id = os.environ.get('USER_POOL_ID', '')
+    if not user_pool_id:
+        print("USER_POOL_ID not set, cannot look up user")
+        return None
+    try:
+        response = cognito.list_users(
+            UserPoolId=user_pool_id,
+            Filter=f'email = "{email}"',
+            Limit=1,
+        )
+        users = response.get('Users', [])
+        if users:
+            return users[0]['Username']
+        return None
+    except Exception as e:
+        print(f"Error looking up Cognito user for {email}: {e}")
+        return None
+
+
+def get_installed_skills(user_id):
+    """Get the list of installed skill IDs for a user."""
+    users_table_name = os.environ.get('USERS_TABLE', '')
+    if not users_table_name:
+        print("USERS_TABLE not set")
+        return []
+    try:
+        users_table = dynamodb.Table(users_table_name)
+        response = users_table.get_item(
+            Key={'userId': user_id},
+            ProjectionExpression='installedSkills',
+        )
+        item = response.get('Item')
+        if item and 'installedSkills' in item:
+            return list(item['installedSkills'])
+        return []
+    except Exception as e:
+        print(f"Error getting installed skills for {user_id}: {e}")
+        return []
+
+
+def load_skill_details(skill_ids):
+    """Load skill metadata from DynamoDB and instructions from S3."""
+    skills_table_name = os.environ.get('SKILLS_TABLE', '')
+    bucket = os.environ.get('SKILLS_BUCKET', '')
+    if not skills_table_name:
+        print("SKILLS_TABLE not set")
+        return []
+
+    skills_table = dynamodb.Table(skills_table_name)
+    skills = []
+    for skill_id in skill_ids:
+        try:
+            response = skills_table.get_item(Key={'skillId': skill_id})
+            item = response.get('Item')
+            if not item:
+                continue
+
+            # Load instructions from S3
+            instructions = ''
+            if bucket:
+                try:
+                    obj = s3.get_object(
+                        Bucket=bucket,
+                        Key=f'skills/{skill_id}/instructions.md',
+                    )
+                    instructions = obj['Body'].read().decode('utf-8')
+                except Exception as e:
+                    print(f"Error loading instructions for {skill_id}: {e}")
+
+            skills.append({
+                'skillId': skill_id,
+                'name': item.get('name', ''),
+                'displayName': item.get('displayName', ''),
+                'schemaJson': item.get('schemaJson', ''),
+                'instructions': instructions,
+            })
+        except Exception as e:
+            print(f"Error loading skill {skill_id}: {e}")
+
+    return skills
 
 
 def extract_email_metadata(bucket, key):
@@ -131,9 +216,13 @@ def format_thread_for_prompt(messages):
     return '\n'.join(lines)
 
 
-def call_claude(thread_text):
-    """Call Claude via Bedrock to extract fields from the email thread."""
-    system_prompt = load_prompt('extract_fields')
+def call_claude(thread_text, skill):
+    """Call Claude via Bedrock to extract fields from the email thread using a specific skill."""
+    # Use skill-specific instructions if available, fall back to default
+    if skill and skill.get('instructions'):
+        system_prompt = skill['instructions']
+    else:
+        system_prompt = load_prompt('extract_fields')
 
     response = bedrock.invoke_model(
         modelId=CLAUDE_MODEL_ID,
@@ -303,48 +392,79 @@ def lambda_handler(event, context):
                     table.put_item(Item=project)
                     print(f"Created project {project_id} for email {key}")
 
-                # Load full thread and call AI
+                # Look up sender's installed skills
+                user_id = get_cognito_user_id(email_sender)
+                skills = []
+                if user_id:
+                    skill_ids = get_installed_skills(user_id)
+                    print(f"User {email_sender} ({user_id}) has {len(skill_ids)} installed skill(s): {skill_ids}")
+                    if skill_ids:
+                        skills = load_skill_details(skill_ids)
+                else:
+                    print(f"No Cognito user found for {email_sender}")
+
+                if not skills:
+                    # No skills installed — reply and stop
+                    print(f"No installed skills for {email_sender}, sending notice")
+                    send_reply(
+                        email_sender, email_subject,
+                        '您好，您目前尚未安裝任何技能，請先至系統中安裝技能後再寄信。',
+                        email_message_id,
+                    )
+                    continue
+
+                # Load full thread
                 messages = load_thread_emails(bucket, project)
                 thread_text = format_thread_for_prompt(messages)
                 print(f"Thread has {len(messages)} message(s)")
 
-                ai_result = call_claude(thread_text)
-                is_complete = ai_result.get('complete', False)
-                print(f"AI assessment: complete={is_complete}, missing={ai_result.get('missing', [])}")
+                # Process each installed skill
+                all_complete = True
+                all_missing = []
+                all_replies = []
+                attachments = []
 
-                if is_complete:
-                    # Generate document
-                    fields = ai_result['fields']
-                    docx_result = generate_docx(fields, project_id)
+                for skill in skills:
+                    print(f"Processing skill: {skill['skillId']} ({skill.get('displayName', skill['name'])})")
+                    ai_result = call_claude(thread_text, skill)
+                    is_complete = ai_result.get('complete', False)
+                    print(f"Skill {skill['skillId']}: complete={is_complete}, missing={ai_result.get('missing', [])}")
 
+                    if is_complete:
+                        fields = ai_result['fields']
+                        docx_result = generate_docx(fields, project_id)
+
+                        if docx_result and docx_result.get('s3Key'):
+                            try:
+                                docx_obj = s3.get_object(
+                                    Bucket=docx_result['bucket'],
+                                    Key=docx_result['s3Key']
+                                )
+                                attachments.append({
+                                    'data': docx_obj['Body'].read(),
+                                    'filename': docx_result.get('filename', '公文.docx'),
+                                })
+                            except Exception as e:
+                                print(f"Error downloading generated docx for {skill['skillId']}: {e}")
+                    else:
+                        all_complete = False
+                        skill_label = skill.get('displayName') or skill['name']
+                        missing = ai_result.get('missing', [])
+                        all_missing.extend([f"[{skill_label}] {m}" for m in missing])
+                        if ai_result.get('reply'):
+                            all_replies.append(f"【{skill_label}】\n{ai_result['reply']}")
+
+                if all_complete and attachments:
+                    # All skills complete — reply with all attachments
                     reply_body = '您好，公文已根據您提供的資訊產生完成，請查收附件。'
-                    attachment = None
-                    if docx_result and docx_result.get('s3Key'):
-                        # Download generated docx from S3
-                        try:
-                            docx_obj = s3.get_object(
-                                Bucket=docx_result['bucket'],
-                                Key=docx_result['s3Key']
-                            )
-                            attachment = {
-                                'data': docx_obj['Body'].read(),
-                                'filename': docx_result.get('filename', '公文.docx'),
-                            }
-                        except Exception as e:
-                            print(f"Error downloading generated docx: {e}")
-                            reply_body = '您好，公文已產生但附件下載失敗，請至系統中下載。'
-
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_body,
-                        email_message_id, attachment
+                        email_message_id, attachments[0] if len(attachments) == 1 else attachments[0]
                     )
+                    # TODO: support multiple attachments
 
-                    # Update project status
                     update_expr = 'SET #status = :status, updatedAt = :ts'
                     expr_values = {':status': 'finished', ':ts': timestamp}
-                    if docx_result and docx_result.get('s3Key'):
-                        update_expr += ', generatedDocumentS3Key = :docKey'
-                        expr_values[':docKey'] = docx_result['s3Key']
                     if ses_message_id:
                         update_expr += ', sesMessageId = :mid'
                         expr_values[':mid'] = ses_message_id
@@ -356,8 +476,12 @@ def lambda_handler(event, context):
                         ExpressionAttributeValues=expr_values,
                     )
                 else:
-                    # Reply asking for missing info
-                    reply_text = ai_result.get('reply', '您好，請提供更多資訊以便產生公文。')
+                    # Some skills incomplete — reply asking for missing info
+                    if all_replies:
+                        reply_text = '\n\n'.join(all_replies)
+                    else:
+                        reply_text = '您好，請提供更多資訊以便產生公文。'
+
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_text,
                         email_message_id
