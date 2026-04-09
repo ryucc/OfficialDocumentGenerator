@@ -24,7 +24,7 @@ if (!IS_MOCK) {
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
-  user: { email: string } | null
+  user: { email: string; userId: string } | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   getIdToken: () => Promise<string | undefined>
@@ -35,8 +35,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(IS_MOCK)
   const [isLoading, setIsLoading] = useState(!IS_MOCK)
-  const [user, setUser] = useState<{ email: string } | null>(
-    IS_MOCK ? { email: 'mock@example.com' } : null
+  const [user, setUser] = useState<{ email: string; userId: string } | null>(
+    IS_MOCK ? { email: 'mock@example.com', userId: 'mock-user-id' } : null
   )
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { getCurrentUser } = await import('aws-amplify/auth')
       const currentUser = await getCurrentUser()
-      setUser({ email: currentUser.signInDetails?.loginId || '' })
+      setUser({ email: currentUser.signInDetails?.loginId || '', userId: currentUser.userId })
       setIsAuthenticated(true)
     } catch {
       setIsAuthenticated(false)
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function login(email: string, password: string) {
     if (IS_MOCK) {
-      setUser({ email })
+      setUser({ email, userId: 'mock-user-id' })
       setIsAuthenticated(true)
       return
     }

@@ -1,0 +1,128 @@
+.skills-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+.skills-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.skills-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--text);
+}
+
+.skills-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-sidebar);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.skills-table thead {
+  background: var(--hover);
+  border-bottom: 2px solid var(--border);
+}
+
+.skills-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.skills-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.skills-table tbody tr:hover {
+  background: var(--hover);
+}
+
+.skills-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.skills-table td {
+  padding: 1rem;
+  color: var(--text);
+}
+
+.skill-name {
+  font-weight: 500;
+}
+
+.skill-owner {
+  color: var(--text-muted);
+}
+
+.skill-description {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 400px;
+}
+
+.skill-btn {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.skill-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.install-btn {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.install-btn:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.uninstall-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.uninstall-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+@media (max-width: 768px) {
+  .skills-table {
+    font-size: 0.85rem;
+  }
+
+  .skills-table th,
+  .skills-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .skill-description {
+    max-width: 200px;
+  }
+}
