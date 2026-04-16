@@ -18,7 +18,7 @@ ses = boto3.client('ses')
 cognito = boto3.client('cognito-idp')
 bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'))
 
-CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-20250514-v1:0')
+CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-6-20250627-v1:0')
 
 
 def load_prompt(name: str) -> str:
