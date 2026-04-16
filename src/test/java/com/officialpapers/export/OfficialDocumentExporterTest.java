@@ -76,6 +76,59 @@ class OfficialDocumentExporterTest {
     }
 
     @Test
+    void exportWritesEveryInviteeAndFlightWhenCountExceedsTemplateRows() throws Exception {
+        Path inputJson = writeJson(root -> {
+            ObjectNode invitees = (ObjectNode) root.get("附件一");
+            var nameList = invitees.putArray("名單");
+            String[][] people = {
+                    {"1", "Stella Lopez Frayle", "F", "Sales Agent", "Explorer Travel"},
+                    {"2", "Toni Reisen", "M", "Manager Special Tours", "Enjoy Reisen"},
+                    {"3", "Nils Hennes Over", "M", "Product Manager Asia", "Journaway"},
+                    {"4", "Patricia Ketteler", "F", "Head of Marketing and PR", "Karawane Reisen"},
+            };
+            for (String[] p : people) {
+                ObjectNode entry = nameList.addObject();
+                entry.put("編號", p[0]);
+                entry.put("姓名", p[1]);
+                entry.put("性別", p[2]);
+                entry.put("職稱", p[3]);
+                entry.put("單位名稱", p[4]);
+                entry.put("邀訪紀錄", "否");
+                entry.put("成效評估", "");
+                entry.put("備註", "");
+            }
+
+            ObjectNode schedule = (ObjectNode) root.get("附件二");
+            var flightList = schedule.putArray("航班資訊");
+            String[][] flights = {
+                    {"FRA→TPE", "CI62", "2024.05.26 10:40", "2024.05.27 06:10"},
+                    {"MUN→IST→TPE", "TK24", "2024.05.26 19:00", "2024.05.27 17:55"},
+                    {"VIE→TPE", "CI64", "2024.05.26 08:50", "2024.05.27 06:10"},
+            };
+            for (String[] f : flights) {
+                ObjectNode entry = flightList.addObject();
+                entry.put("航班資訊", f[0]);
+                entry.put("班機號碼", f[1]);
+                entry.put("出發時間", f[2]);
+                entry.put("抵達時間", f[3]);
+            }
+        });
+
+        Path outputFile = exporter.export(inputJson, tempDir);
+
+        try (XWPFDocument document = new XWPFDocument(Files.newInputStream(outputFile))) {
+            assertEquals("Stella Lopez Frayle", joinedCellText(document, 1, 2, 1));
+            assertEquals("Toni Reisen", joinedCellText(document, 1, 3, 1));
+            assertEquals("Nils Hennes Over", joinedCellText(document, 1, 4, 1));
+            assertEquals("Patricia Ketteler", joinedCellText(document, 1, 5, 1));
+
+            assertEquals("CI62", joinedCellText(document, 2, 1, 1));
+            assertEquals("TK24", joinedCellText(document, 2, 2, 1));
+            assertEquals("CI64", joinedCellText(document, 2, 3, 1));
+        }
+    }
+
+    @Test
     void exportRejectsMissingApplicationFormSection() throws Exception {
         Path inputJson = writeJson(root -> root.remove("申請表"));
 
