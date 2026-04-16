@@ -19,26 +19,34 @@ public record OfficialDocumentData(
             @JsonProperty("對象勾選列") String inviteeTypeLine,
             @JsonProperty("緣由") String reason,
             @JsonProperty("市場屬性") String marketAttribute,
-            @JsonProperty("方式列") List<String> inviteMethodLines,
+            @JsonProperty("方式") String inviteMethod,
             @JsonProperty("人數") String headcountText,
             @JsonProperty("出發地") String departureLocation,
             @JsonProperty("時間") String timeRangeText,
             @JsonProperty("年度計畫") String annualPlanText,
-            @JsonProperty("申請單位經費列") List<String> applicantFundingLines,
+            @JsonProperty("申請單位經費") boolean applicantFunding,
             @JsonProperty("申請單位預估金額列") List<String> applicantEstimateLines,
             @JsonProperty("申請單位分攤比例") String applicantShareRatio,
-            @JsonProperty("其他來源列") List<String> otherFundingLines,
+            @JsonProperty("其他來源") boolean otherFunding,
             @JsonProperty("其他來源預估金額列") List<String> otherEstimateLines,
             @JsonProperty("其他來源分攤比例") String otherShareRatio,
             @JsonProperty("本署支應列") List<String> requestedSupportLines,
             @JsonProperty("本署支應預估金額列") List<String> requestedEstimateLines,
             @JsonProperty("本署支應分攤比例") String requestedShareRatio,
             @JsonProperty("超過五成理由") String overHalfReason,
-            @JsonProperty("預期效益列") List<String> expectedBenefitLines,
+            @JsonProperty("預期效益") ExpectedBenefit expectedBenefit,
             @JsonProperty("預定核銷時間") String writeoffDate,
             @JsonProperty("預定成果報核時間") String resultReportDate,
             @JsonProperty("備註列") List<String> noteLines,
             @JsonProperty("附件資料列") List<String> attachmentLines
+    ) {
+    }
+
+    public record ExpectedBenefit(
+            @JsonProperty("影響範圍") String scope,
+            @JsonProperty("影響層面") String audience,
+            @JsonProperty("預估達成旅遊人數") String estimatedTourists,
+            @JsonProperty("其他效益") String otherBenefits
     ) {
     }
 

@@ -7,6 +7,7 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
@@ -14,6 +15,7 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -75,7 +77,7 @@ class OfficialDocumentDocxGenerator {
     }
 
     private void writeHeadings(HeadingSections headings, OfficialDocumentData data) {
-        setParagraphText(headings.title(), safeText(data.title()));
+        setParagraphText(headings.title(), config.documentTitle());
         setPageBreakBefore(headings.attachmentOne());
         setParagraphText(
                 headings.attachmentOne(),
@@ -151,29 +153,33 @@ class OfficialDocumentDocxGenerator {
         setCellLines(table.getRow(0).getCell(1), List.of(safeText(form.applicationUnit())));
         setCellLines(table.getRow(0).getCell(3), List.of(safeText(form.applicationDate())));
         setCellLines(table.getRow(1).getCell(3), List.of(safeText(form.documentNumber())));
-        setCellLines(table.getRow(2).getCell(2), List.of(safeText(form.inviteeTypeLine())));
+        setInviteeTypeCell(table.getRow(2).getCell(2), form.inviteeTypeLine());
         setCellLines(table.getRow(3).getCell(2), List.of(safeText(form.reason())));
         setCellLines(table.getRow(4).getCell(2), List.of(safeText(form.marketAttribute())));
-        setCellLines(table.getRow(5).getCell(2), safeLines(form.inviteMethodLines()));
+        setInviteMethodCell(table.getRow(5).getCell(2), form.inviteMethod());
         setCellLines(table.getRow(6).getCell(2), List.of(safeText(form.headcountText())));
         setCellLines(table.getRow(6).getCell(4), List.of(safeText(form.departureLocation())));
         setCellLines(table.getRow(7).getCell(2), List.of(safeText(form.timeRangeText())));
         setCellLines(table.getRow(8).getCell(2), List.of(safeText(form.annualPlanText())));
-        setCellLines(table.getRow(10).getCell(1), safeLines(form.applicantFundingLines()));
-        setCellLines(table.getRow(10).getCell(2), safeLines(form.applicantEstimateLines()));
+        String applicantMarker = form.applicantFunding() ? "★" : "□";
+        setCellLines(table.getRow(10).getCell(1), List.of(
+                applicantMarker + " 申請單位經費", "（附件三：經費概算表）", "預算科目：邀訪預算"));
+        setCellLines(table.getRow(10).getCell(2), formatEstimateLines(form.applicantEstimateLines()));
         setCellLines(table.getRow(10).getCell(3), List.of(safeText(form.applicantShareRatio())));
-        setCellLines(table.getRow(11).getCell(1), safeLines(form.otherFundingLines()));
-        setCellLines(table.getRow(11).getCell(2), safeLines(form.otherEstimateLines()));
+        String otherMarker = form.otherFunding() ? "★" : "□";
+        setCellLines(table.getRow(11).getCell(1), List.of(
+                otherMarker + " 其他來源：", "預算科目："));
+        setCellLines(table.getRow(11).getCell(2), formatEstimateLines(form.otherEstimateLines()));
         setCellLines(table.getRow(11).getCell(3), List.of(safeText(form.otherShareRatio())));
-        setCellLines(table.getRow(12).getCell(1), safeLines(form.requestedSupportLines()));
-        setCellLines(table.getRow(12).getCell(2), safeLines(form.requestedEstimateLines()));
+        setCellLines(table.getRow(12).getCell(1), renderSupportLines(form.requestedSupportLines()));
+        setCellLines(table.getRow(12).getCell(2), formatEstimateLines(form.requestedEstimateLines()));
         setCellLines(table.getRow(12).getCell(3), List.of(safeText(form.requestedShareRatio())));
         setCellLines(table.getRow(13).getCell(2), List.of(safeText(form.overHalfReason())));
-        setCellLines(table.getRow(14).getCell(1), safeLines(form.expectedBenefitLines()));
+        setExpectedBenefitCell(table.getRow(14).getCell(1), form.expectedBenefit());
         setCellLines(table.getRow(15).getCell(1), List.of(safeText(form.writeoffDate())));
         setCellLines(table.getRow(15).getCell(3), List.of(safeText(form.resultReportDate())));
         setCellLines(table.getRow(16).getCell(1), safeLines(form.noteLines()));
-        setCellLines(table.getRow(17).getCell(1), safeLines(form.attachmentLines()));
+        setCellLines(table.getRow(17).getCell(1), prefixLines("★ ", form.attachmentLines()));
     }
 
     private void fillInviteeTable(XWPFTable table, List<OfficialDocumentData.InviteeEntry> entries) {
@@ -229,12 +235,31 @@ class OfficialDocumentDocxGenerator {
 
         XWPFTableRow templateRow = table.getRow(templateRowIndex);
         while (table.getNumberOfRows() < startRowIndex + desiredRowCount) {
-            table.addRow(cloneRow(table, templateRow));
+            cloneRow(table, templateRow);
         }
     }
 
+    // XWPFTable.addRow(row) deep-copies the CTRow into the document tree, leaving
+    // the wrapper's cells pointing at the orphaned copy — subsequent setCellLines
+    // calls then write to detached XML. Insert the CTRow into the tree first, then
+    // wrap the in-tree CTRow so cell edits land in the document.
     private XWPFTableRow cloneRow(XWPFTable table, XWPFTableRow templateRow) {
-        return new XWPFTableRow((CTRow) templateRow.getCtRow().copy(), table);
+        CTRow inTreeCtRow = table.getCTTbl().addNewTr();
+        inTreeCtRow.set(templateRow.getCtRow().copy());
+        XWPFTableRow newRow = new XWPFTableRow(inTreeCtRow, table);
+        internalTableRows(table).add(newRow);
+        return newRow;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<XWPFTableRow> internalTableRows(XWPFTable table) {
+        try {
+            Field tableRowsField = XWPFTable.class.getDeclaredField("tableRows");
+            tableRowsField.setAccessible(true);
+            return (List<XWPFTableRow>) tableRowsField.get(table);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Unable to access XWPFTable.tableRows", exception);
+        }
     }
 
     private XWPFParagraph requireParagraph(XWPFDocument document, int bodyElementIndex) {
@@ -340,6 +365,115 @@ class OfficialDocumentDocxGenerator {
         return null;
     }
 
+    private static final List<String> SUPPORT_ITEM_OPTIONS = List.of(
+            "在台交通費", "住宿費", "膳雜費", "英文導遊費", "機票款");
+
+    private List<String> renderSupportLines(List<String> selected) {
+        List<String> selectedSet = selected == null ? List.of() : selected;
+        boolean hasAny = !selectedSet.isEmpty();
+        String headerMarker = hasAny ? "★" : "□";
+        List<String> lines = new ArrayList<>();
+        lines.add(headerMarker + " 擬請求本署經費支應項目：");
+        for (int i = 0; i < SUPPORT_ITEM_OPTIONS.size(); i += 2) {
+            StringBuilder sb = new StringBuilder();
+            for (int j = i; j < Math.min(i + 2, SUPPORT_ITEM_OPTIONS.size()); j++) {
+                String option = SUPPORT_ITEM_OPTIONS.get(j);
+                String marker = selectedSet.contains(option) ? "★" : "□";
+                if (j > i) sb.append(" ");
+                sb.append(marker).append(" ").append(option);
+            }
+            lines.add(sb.toString());
+        }
+        return lines;
+    }
+
+    private List<String> formatEstimateLines(List<String> lines) {
+        String foreign = "";
+        String twd = "";
+        if (lines != null) {
+            for (String line : lines) {
+                if (line == null) continue;
+                String trimmed = line.trim();
+                if (trimmed.startsWith("約合新台幣")) {
+                    twd = trimmed.substring("約合新台幣".length()).trim();
+                } else if (!trimmed.isEmpty() && foreign.isEmpty()) {
+                    foreign = trimmed;
+                }
+            }
+        }
+        return List.of("外幣：" + foreign, "約合新台幣：" + twd);
+    }
+
+    private void setExpectedBenefitCell(XWPFTableCell cell, OfficialDocumentData.ExpectedBenefit benefit) {
+        String scope = benefit == null ? "" : safeText(benefit.scope());
+        String audience = benefit == null ? "" : safeText(benefit.audience());
+        String tourists = benefit == null ? "" : safeText(benefit.estimatedTourists());
+        String other = benefit == null ? "" : safeText(benefit.otherBenefits());
+
+        boolean isAll = scope.startsWith("全轄區");
+        String scopePayload = scope;
+        if (isAll) {
+            scopePayload = scope.substring("全轄區".length()).replaceAll("^[：:_\\s-]+", "").trim();
+        } else {
+            scopePayload = scope.replaceAll("^特定範圍[：:_\\s-]*", "").trim();
+        }
+
+        CTRPr templateRunProperties = copyRunProperties(cell);
+
+        List<XWPFParagraph> existing = new ArrayList<>(cell.getParagraphs());
+        CTPPr templateParagraphProperties = existing.isEmpty()
+                ? null
+                : copyParagraphProperties(existing.get(0));
+
+        int targetLines = 4;
+        while (cell.getParagraphs().size() > targetLines) {
+            cell.removeParagraph(cell.getParagraphs().size() - 1);
+        }
+        while (cell.getParagraphs().size() < targetLines) {
+            XWPFParagraph p = cell.addParagraph();
+            if (templateParagraphProperties != null) {
+                p.getCTP().setPPr((CTPPr) templateParagraphProperties.copy());
+            }
+        }
+        for (XWPFParagraph p : cell.getParagraphs()) {
+            if (templateParagraphProperties != null && !p.getCTP().isSetPPr()) {
+                p.getCTP().setPPr((CTPPr) templateParagraphProperties.copy());
+            }
+            clearRuns(p);
+        }
+
+        XWPFParagraph p0 = cell.getParagraphs().get(0);
+        String scopeMarkerAll = isAll ? "★" : "□";
+        String scopeMarkerSpecific = isAll ? "□" : "★";
+        addStyledRun(p0, templateRunProperties, "影響範圍：" + scopeMarkerAll + " 全轄區  " + scopeMarkerSpecific + " 特定範圍", false);
+        String scopeNote = scopePayload.isEmpty() ? "　　　　　" : scopePayload;
+        addStyledRun(p0, templateRunProperties, scopeNote, true);
+
+        XWPFParagraph p1 = cell.getParagraphs().get(1);
+        addStyledRun(p1, templateRunProperties, "影響層面：", false);
+        String audienceNote = audience.isEmpty() ? "　　　　　" : audience;
+        addStyledRun(p1, templateRunProperties, audienceNote, true);
+
+        XWPFParagraph p2 = cell.getParagraphs().get(2);
+        addStyledRun(p2, templateRunProperties, "預估達成旅遊人數：", false);
+        String touristsNote = tourists.isEmpty() ? "　　　　　" : tourists;
+        addStyledRun(p2, templateRunProperties, touristsNote, true);
+
+        XWPFParagraph p3 = cell.getParagraphs().get(3);
+        addStyledRun(p3, templateRunProperties, "其他效益：" + other, false);
+    }
+
+    private List<String> prefixLines(String prefix, List<String> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return List.of("");
+        }
+        List<String> result = new ArrayList<>();
+        for (String line : lines) {
+            result.add(prefix + safeText(line));
+        }
+        return result;
+    }
+
     private List<String> safeLines(List<String> lines) {
         if (lines == null || lines.isEmpty()) {
             return List.of("");
@@ -353,6 +487,97 @@ class OfficialDocumentDocxGenerator {
 
     private String safeText(String value) {
         return value == null ? "" : value;
+    }
+
+    private static final List<String> INVITEE_TYPE_OPTIONS = List.of("業者", "媒體", "其他");
+
+    private void setInviteeTypeCell(XWPFTableCell cell, String selected) {
+        String raw = selected == null ? "" : selected.trim();
+        String selectedBase = raw.replaceAll("[（(：:_].*", "").trim();
+        String otherNote = "";
+        if (selectedBase.equals("其他")) {
+            otherNote = raw.substring("其他".length())
+                    .replaceAll("^[（(：:_\\s-]+", "")
+                    .replaceAll("[）)\\s]+$", "")
+                    .trim();
+        }
+
+        CTRPr templateRunProperties = copyRunProperties(cell);
+        XWPFParagraph paragraph = prepareSingleParagraph(cell);
+
+        for (int index = 0; index < INVITEE_TYPE_OPTIONS.size(); index++) {
+            String option = INVITEE_TYPE_OPTIONS.get(index);
+            String marker = option.equals(selectedBase) ? "★" : "□";
+            String prefix = (index == 0 ? "" : "  ") + marker + " " + option;
+            addStyledRun(paragraph, templateRunProperties, prefix, false);
+            if (option.equals("其他")) {
+                String note = otherNote.isEmpty() ? "　　　　　" : otherNote;
+                addStyledRun(paragraph, templateRunProperties, note, true);
+            }
+        }
+    }
+
+    private static final List<String> INVITE_METHOD_OPTIONS = List.of("自行邀訪", "合作邀訪");
+
+    private void setInviteMethodCell(XWPFTableCell cell, String selected) {
+        String raw = selected == null ? "" : selected.trim();
+        String selectedBase = raw.replaceAll("[，,（(：:_].*", "").trim();
+        String partner = "";
+        if (selectedBase.equals("合作邀訪")) {
+            partner = raw.substring("合作邀訪".length())
+                    .replaceAll("^[，,（(：:_\\s-]*(合作單位)?[（(：:_\\s-]*", "")
+                    .replaceAll("[）)\\s]+$", "")
+                    .trim();
+        }
+
+        CTRPr templateRunProperties = copyRunProperties(cell);
+        XWPFParagraph paragraph = prepareSingleParagraph(cell);
+
+        for (int index = 0; index < INVITE_METHOD_OPTIONS.size(); index++) {
+            String option = INVITE_METHOD_OPTIONS.get(index);
+            String marker = option.equals(selectedBase) ? "★" : "□";
+            String prefix = (index == 0 ? "" : "  ") + marker + " " + option;
+            addStyledRun(paragraph, templateRunProperties, prefix, false);
+            if (option.equals("合作邀訪")) {
+                addStyledRun(paragraph, templateRunProperties, "，合作單位：", false);
+                String note = partner.isEmpty() ? "　　　　　" : partner;
+                addStyledRun(paragraph, templateRunProperties, note, true);
+            }
+        }
+    }
+
+    private XWPFParagraph prepareSingleParagraph(XWPFTableCell cell) {
+        List<XWPFParagraph> paragraphs = new ArrayList<>(cell.getParagraphs());
+        CTPPr templateParagraphProperties = paragraphs.isEmpty()
+                ? null
+                : copyParagraphProperties(paragraphs.get(0));
+        while (cell.getParagraphs().size() > 1) {
+            cell.removeParagraph(cell.getParagraphs().size() - 1);
+        }
+        if (cell.getParagraphs().isEmpty()) {
+            cell.addParagraph();
+        }
+        XWPFParagraph paragraph = cell.getParagraphs().get(0);
+        if (templateParagraphProperties != null) {
+            paragraph.getCTP().setPPr((CTPPr) templateParagraphProperties.copy());
+        }
+        clearRuns(paragraph);
+        return paragraph;
+    }
+
+    private static final String UNDERLINE_PAD = "  ";
+
+    private void addStyledRun(XWPFParagraph paragraph, CTRPr templateRunProperties, String text, boolean underline) {
+        XWPFRun run = paragraph.createRun();
+        if (templateRunProperties != null) {
+            run.getCTR().setRPr((CTRPr) templateRunProperties.copy());
+        }
+        if (underline) {
+            run.setUnderline(UnderlinePatterns.SINGLE);
+            run.setText(UNDERLINE_PAD + text + UNDERLINE_PAD);
+        } else {
+            run.setText(text);
+        }
     }
 
     private String valueOrDefault(String value, String fallback) {
