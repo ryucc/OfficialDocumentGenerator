@@ -66,13 +66,15 @@ class OfficialDocumentDocxGenerator {
         trimTemplate(document);
         removeBlankParagraphsBeforeHeading(document, config.attachmentOneMarker());
         removeBlankParagraphsBeforeHeading(document, config.attachmentTwoMarker());
+        removeBlankParagraphsBeforeHeading(document, config.attachmentThreeMarker());
     }
 
     private HeadingSections locateHeadings(XWPFDocument document) {
         return new HeadingSections(
                 requireParagraph(document, 0),
                 requireParagraphContaining(document, config.attachmentOneMarker()),
-                requireParagraphContaining(document, config.attachmentTwoMarker())
+                requireParagraphContaining(document, config.attachmentTwoMarker()),
+                requireParagraphContaining(document, config.attachmentThreeMarker())
         );
     }
 
@@ -88,6 +90,8 @@ class OfficialDocumentDocxGenerator {
                 headings.attachmentTwo(),
                 valueOrDefault(data.scheduleAttachment().heading(), config.defaultAttachmentTwoHeading())
         );
+        setPageBreakBefore(headings.attachmentThree());
+        setParagraphText(headings.attachmentThree(), config.defaultAttachmentThreeHeading());
     }
 
     private TableSections locateTables(XWPFDocument document) {
@@ -95,15 +99,18 @@ class OfficialDocumentDocxGenerator {
                 requireTable(document, 0),
                 requireTable(document, 1),
                 requireTable(document, 2),
-                requireTable(document, 3)
+                requireTable(document, 3),
+                requireTable(document, 4)
         );
     }
 
     private void writeTables(TableSections tables, OfficialDocumentData data) {
-        fillMainApplicationTable(tables.application(), data.applicationForm());
+        FundingSummary funding = computeFundingSummary(data.budgetAttachment());
+        fillMainApplicationTable(tables.application(), data.applicationForm(), funding);
         fillInviteeTable(tables.invitees(), data.inviteeAttachment().entries());
         fillFlightTable(tables.flights(), data.scheduleAttachment().flights());
         fillItineraryTable(tables.itinerary(), data.scheduleAttachment().itinerary());
+        fillBudgetTable(tables.budget(), data.budgetAttachment(), funding);
     }
 
     private byte[] serializeDocument(XWPFDocument document) throws IOException {
@@ -149,7 +156,7 @@ class OfficialDocumentDocxGenerator {
         }
     }
 
-    private void fillMainApplicationTable(XWPFTable table, OfficialDocumentData.ApplicationForm form) {
+    private void fillMainApplicationTable(XWPFTable table, OfficialDocumentData.ApplicationForm form, FundingSummary funding) {
         setCellLines(table.getRow(0).getCell(1), List.of(safeText(form.applicationUnit())));
         setCellLines(table.getRow(0).getCell(3), List.of(safeText(form.applicationDate())));
         setCellLines(table.getRow(1).getCell(3), List.of(safeText(form.documentNumber())));
@@ -161,19 +168,19 @@ class OfficialDocumentDocxGenerator {
         setCellLines(table.getRow(6).getCell(4), List.of(safeText(form.departureLocation())));
         setCellLines(table.getRow(7).getCell(2), List.of(safeText(form.timeRangeText())));
         setCellLines(table.getRow(8).getCell(2), List.of(safeText(form.annualPlanText())));
-        String applicantMarker = form.applicantFunding() ? "★" : "□";
+        String applicantMarker = funding.applicantEur() > 0 ? "★" : "□";
         setCellLines(table.getRow(10).getCell(1), List.of(
                 applicantMarker + " 申請單位經費", "（附件三：經費概算表）", "預算科目：邀訪預算"));
-        setCellLines(table.getRow(10).getCell(2), formatEstimateLines(form.applicantEstimateLines()));
-        setCellLines(table.getRow(10).getCell(3), List.of(safeText(form.applicantShareRatio())));
-        String otherMarker = form.otherFunding() ? "★" : "□";
+        setCellLines(table.getRow(10).getCell(2), formatFundingAmount(funding.applicantEur()));
+        setCellLines(table.getRow(10).getCell(3), List.of(formatPercent(funding.applicantPercent())));
+        String otherMarker = funding.otherEur() > 0 ? "★" : "□";
         setCellLines(table.getRow(11).getCell(1), List.of(
                 otherMarker + " 其他來源：", "預算科目："));
-        setCellLines(table.getRow(11).getCell(2), formatEstimateLines(form.otherEstimateLines()));
-        setCellLines(table.getRow(11).getCell(3), List.of(safeText(form.otherShareRatio())));
-        setCellLines(table.getRow(12).getCell(1), renderSupportLines(form.requestedSupportLines()));
-        setCellLines(table.getRow(12).getCell(2), formatEstimateLines(form.requestedEstimateLines()));
-        setCellLines(table.getRow(12).getCell(3), List.of(safeText(form.requestedShareRatio())));
+        setCellLines(table.getRow(11).getCell(2), formatFundingAmount(funding.otherEur()));
+        setCellLines(table.getRow(11).getCell(3), List.of(formatPercent(funding.otherPercent())));
+        setCellLines(table.getRow(12).getCell(1), renderSupportLines(deriveSupportSelection(funding)));
+        setCellLines(table.getRow(12).getCell(2), formatFundingAmount(funding.requestedEur()));
+        setCellLines(table.getRow(12).getCell(3), List.of(formatPercent(funding.requestedPercent())));
         setCellLines(table.getRow(13).getCell(2), List.of(safeText(form.overHalfReason())));
         setExpectedBenefitCell(table.getRow(14).getCell(1), form.expectedBenefit());
         setCellLines(table.getRow(15).getCell(1), List.of(safeText(form.writeoffDate())));
@@ -387,21 +394,124 @@ class OfficialDocumentDocxGenerator {
         return lines;
     }
 
-    private List<String> formatEstimateLines(List<String> lines) {
-        String foreign = "";
-        String twd = "";
-        if (lines != null) {
-            for (String line : lines) {
-                if (line == null) continue;
-                String trimmed = line.trim();
-                if (trimmed.startsWith("約合新台幣")) {
-                    twd = trimmed.substring("約合新台幣".length()).trim();
-                } else if (!trimmed.isEmpty() && foreign.isEmpty()) {
-                    foreign = trimmed;
+    private List<String> formatFundingAmount(long eur) {
+        long twd = eur * config.eurToTwdRate();
+        return List.of("外幣：€" + String.format("%,d", eur),
+                "約合新台幣：" + chineseTwdFormat(twd) + " 元");
+    }
+
+    private String formatPercent(int percent) {
+        return percent == 0 ? "" : percent + "%";
+    }
+
+    private String chineseTwdFormat(long amount) {
+        if (amount < 10000) {
+            return String.format("%,d", amount);
+        }
+        long wan = amount / 10000;
+        long remainder = amount % 10000;
+        if (remainder == 0) {
+            return String.format("%,d萬", wan);
+        }
+        return String.format("%,d萬%,d", wan, remainder);
+    }
+
+    private List<String> deriveSupportSelection(FundingSummary funding) {
+        List<String> selected = new ArrayList<>();
+        for (String option : SUPPORT_ITEM_OPTIONS) {
+            if (funding.requestedItems().stream().anyMatch(item -> item.contains(option))) {
+                selected.add(option);
+            }
+        }
+        return selected;
+    }
+
+    private FundingSummary computeFundingSummary(OfficialDocumentData.BudgetAttachment budget) {
+        long applicant = 0, other = 0, requested = 0;
+        List<String> requestedItems = new ArrayList<>();
+        if (budget != null && budget.items() != null) {
+            for (OfficialDocumentData.BudgetItem item : budget.items()) {
+                long subtotal = item.unitPrice() * item.quantity();
+                String source = item.fundingSource() == null ? "" : item.fundingSource().trim();
+                switch (source) {
+                    case "申請單位" -> applicant += subtotal;
+                    case "其他" -> other += subtotal;
+                    case "本署" -> {
+                        requested += subtotal;
+                        requestedItems.add(safeText(item.content()));
+                    }
+                    default -> {
+                        requested += subtotal;
+                        requestedItems.add(safeText(item.content()));
+                    }
                 }
             }
         }
-        return List.of("外幣：" + foreign, "約合新台幣：" + twd);
+        long total = applicant + other + requested;
+        int applicantPct = percentOf(applicant, total);
+        int otherPct = percentOf(other, total);
+        int requestedPct = total == 0 ? 0 : 100 - applicantPct - otherPct;
+        return new FundingSummary(applicant, other, requested, applicantPct, otherPct, requestedPct, requestedItems);
+    }
+
+    private int percentOf(long part, long total) {
+        if (total == 0) return 0;
+        return (int) Math.round((part * 100.0) / total);
+    }
+
+    private void fillBudgetTable(XWPFTable table, OfficialDocumentData.BudgetAttachment budget, FundingSummary funding) {
+        List<OfficialDocumentData.BudgetItem> items = budget == null || budget.items() == null
+                ? List.of()
+                : budget.items();
+
+        CTRow dataTemplate = (CTRow) table.getRow(1).getCtRow().copy();
+        XWPFTableRow lastRow = table.getRow(table.getNumberOfRows() - 1);
+        CTRow totalTemplate = (CTRow) lastRow.getCtRow().copy();
+
+        while (table.getNumberOfRows() > 1) {
+            table.removeRow(table.getNumberOfRows() - 1);
+        }
+
+        for (int index = 0; index < items.size(); index++) {
+            OfficialDocumentData.BudgetItem item = items.get(index);
+            XWPFTableRow row = appendRowFromTemplate(table, dataTemplate);
+            long subtotal = item.unitPrice() * item.quantity();
+            setCellLines(row.getCell(0), List.of(String.valueOf(index + 1)));
+            setCellLines(row.getCell(1), List.of(safeText(item.content())));
+            setCellLines(row.getCell(2), List.of(String.format("%,d", item.unitPrice())));
+            setCellLines(row.getCell(3), List.of(String.valueOf(item.quantity())));
+            setCellLines(row.getCell(4), List.of(String.format("%,d", subtotal)));
+            setCellLines(row.getCell(5), List.of(safeText(item.note())));
+        }
+
+        XWPFTableRow totalRow = appendRowFromTemplate(table, totalTemplate);
+        long totalEur = funding.applicantEur() + funding.otherEur() + funding.requestedEur();
+        long totalTwd = totalEur * config.eurToTwdRate();
+        setCellLines(totalRow.getCell(0), List.of("合計"));
+        if (totalRow.getTableCells().size() > 1) {
+            setCellLines(totalRow.getCell(1), List.of(String.format(
+                    "共計€%,d 約合新台幣 %s 元整   兌換匯率 歐元:台幣 = 1:%d",
+                    totalEur, chineseTwdFormat(totalTwd), config.eurToTwdRate())));
+        }
+    }
+
+    private XWPFTableRow appendRowFromTemplate(XWPFTable table, CTRow template) {
+        CTRow inTreeCtRow = table.getCTTbl().addNewTr();
+        inTreeCtRow.set(template.copy());
+        XWPFTableRow newRow = new XWPFTableRow(inTreeCtRow, table);
+        internalTableRows(table).add(newRow);
+        return newRow;
+    }
+
+    private record FundingSummary(
+            long applicantEur,
+            long otherEur,
+            long requestedEur,
+            int applicantPercent,
+            int otherPercent,
+            int requestedPercent,
+            List<String> requestedItems
+    ) {
     }
 
     private void setExpectedBenefitCell(XWPFTableCell cell, OfficialDocumentData.ExpectedBenefit benefit) {
@@ -590,7 +700,8 @@ class OfficialDocumentDocxGenerator {
     private record HeadingSections(
             XWPFParagraph title,
             XWPFParagraph attachmentOne,
-            XWPFParagraph attachmentTwo
+            XWPFParagraph attachmentTwo,
+            XWPFParagraph attachmentThree
     ) {
     }
 
@@ -598,7 +709,8 @@ class OfficialDocumentDocxGenerator {
             XWPFTable application,
             XWPFTable invitees,
             XWPFTable flights,
-            XWPFTable itinerary
+            XWPFTable itinerary,
+            XWPFTable budget
     ) {
     }
 }
