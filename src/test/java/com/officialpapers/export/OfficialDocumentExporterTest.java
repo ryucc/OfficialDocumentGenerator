@@ -54,7 +54,7 @@ class OfficialDocumentExporterTest {
                 XWPFDocument document = new XWPFDocument(Files.newInputStream(outputFile));
                 XWPFWordExtractor extractor = new XWPFWordExtractor(document)
         ) {
-            assertEquals(4, document.getTables().size());
+            assertEquals(5, document.getTables().size());
             assertEquals(
                     "交通部觀光署駐外辦事處重要人士邀訪申請表",
                     document.getParagraphs().get(0).getText()
