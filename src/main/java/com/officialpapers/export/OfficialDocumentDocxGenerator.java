@@ -11,6 +11,7 @@ import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblLayoutType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -217,6 +218,7 @@ class OfficialDocumentDocxGenerator {
     }
 
     private void fillItineraryTable(XWPFTable table, List<OfficialDocumentData.ItineraryRow> itinerary) {
+        forceFixedLayout(table);
         resizeDataRows(table, 1, itinerary.size(), 1);
 
         for (int index = 0; index < itinerary.size(); index++) {
@@ -227,6 +229,12 @@ class OfficialDocumentDocxGenerator {
             setCellLines(row.getCell(1), safeLines(item.itineraryLines()));
             setCellLines(row.getCell(2), safeLines(item.accommodationLines()));
         }
+    }
+
+    private void forceFixedLayout(XWPFTable table) {
+        var tblPr = table.getCTTbl().getTblPr();
+        var layout = tblPr.isSetTblLayout() ? tblPr.getTblLayout() : tblPr.addNewTblLayout();
+        layout.setType(STTblLayoutType.FIXED);
     }
 
     private void resizeDataRows(XWPFTable table, int startRowIndex, int desiredRowCount, int templateRowIndex) {
