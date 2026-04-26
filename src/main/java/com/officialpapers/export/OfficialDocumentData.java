@@ -1,17 +1,21 @@
 package com.officialpapers.export;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record OfficialDocumentData(
         @JsonProperty("輸出檔名") String outputFileBaseName,
         @JsonProperty("標題") String title,
         @JsonProperty("申請表") ApplicationForm applicationForm,
         @JsonProperty("附件一") InviteeAttachment inviteeAttachment,
-        @JsonProperty("附件二") ScheduleAttachment scheduleAttachment
+        @JsonProperty("附件二") ScheduleAttachment scheduleAttachment,
+        @JsonProperty("附件三") BudgetAttachment budgetAttachment
 ) {
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ApplicationForm(
             @JsonProperty("申請單位") String applicationUnit,
             @JsonProperty("申請日期") String applicationDate,
@@ -24,15 +28,6 @@ public record OfficialDocumentData(
             @JsonProperty("出發地") String departureLocation,
             @JsonProperty("時間") String timeRangeText,
             @JsonProperty("年度計畫") String annualPlanText,
-            @JsonProperty("申請單位經費") boolean applicantFunding,
-            @JsonProperty("申請單位預估金額列") List<String> applicantEstimateLines,
-            @JsonProperty("申請單位分攤比例") String applicantShareRatio,
-            @JsonProperty("其他來源") boolean otherFunding,
-            @JsonProperty("其他來源預估金額列") List<String> otherEstimateLines,
-            @JsonProperty("其他來源分攤比例") String otherShareRatio,
-            @JsonProperty("本署支應列") List<String> requestedSupportLines,
-            @JsonProperty("本署支應預估金額列") List<String> requestedEstimateLines,
-            @JsonProperty("本署支應分攤比例") String requestedShareRatio,
             @JsonProperty("超過五成理由") String overHalfReason,
             @JsonProperty("預期效益") ExpectedBenefit expectedBenefit,
             @JsonProperty("預定核銷時間") String writeoffDate,
@@ -87,6 +82,20 @@ public record OfficialDocumentData(
             @JsonProperty("日期列") List<String> dateLines,
             @JsonProperty("建議行程列") List<String> itineraryLines,
             @JsonProperty("住宿列") List<String> accommodationLines
+    ) {
+    }
+
+    public record BudgetAttachment(
+            @JsonProperty("明細") List<BudgetItem> items
+    ) {
+    }
+
+    public record BudgetItem(
+            @JsonProperty("內容") String content,
+            @JsonProperty("單價") long unitPrice,
+            @JsonProperty("數量") long quantity,
+            @JsonProperty("資金來源") String fundingSource,
+            @JsonProperty("備註") String note
     ) {
     }
 }
