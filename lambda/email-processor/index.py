@@ -446,6 +446,10 @@ def lambda_handler(event, context):
                                 })
                             except Exception as e:
                                 print(f"Error downloading generated docx for {skill['skillId']}: {e}")
+
+                        if ai_result.get('reply'):
+                            skill_label = skill.get('displayName') or skill['name']
+                            all_replies.append(f"【{skill_label}】\n{ai_result['reply']}")
                     else:
                         all_complete = False
                         skill_label = skill.get('displayName') or skill['name']
@@ -456,7 +460,10 @@ def lambda_handler(event, context):
 
                 if all_complete and attachments:
                     # All skills complete — reply with all attachments
-                    reply_body = '您好，公文已根據您提供的資訊產生完成，請查收附件。'
+                    if all_replies:
+                        reply_body = '\n\n'.join(all_replies)
+                    else:
+                        reply_body = '您好，公文已根據您提供的資訊產生完成，請查收附件。'
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_body,
                         email_message_id, attachments[0] if len(attachments) == 1 else attachments[0]
