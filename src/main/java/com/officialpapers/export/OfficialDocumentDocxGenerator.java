@@ -8,6 +8,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTFonts;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRow;
@@ -364,7 +365,18 @@ class OfficialDocumentDocxGenerator {
                 return paragraphProperties;
             }
         }
-        return null;
+        return defaultKaiTiRunProperties();
+    }
+
+    private static final String DEFAULT_FONT = "KaiTi";
+
+    private CTRPr defaultKaiTiRunProperties() {
+        CTRPr rPr = CTRPr.Factory.newInstance();
+        CTFonts fonts = rPr.addNewRFonts();
+        fonts.setAscii(DEFAULT_FONT);
+        fonts.setEastAsia(DEFAULT_FONT);
+        fonts.setHAnsi(DEFAULT_FONT);
+        return rPr;
     }
 
     private CTPPr copyParagraphProperties(XWPFParagraph paragraph) {
