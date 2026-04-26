@@ -81,15 +81,9 @@ class OfficialDocumentDocxGenerator {
     private void writeHeadings(HeadingSections headings, OfficialDocumentData data) {
         setParagraphText(headings.title(), config.documentTitle());
         setPageBreakBefore(headings.attachmentOne());
-        setParagraphText(
-                headings.attachmentOne(),
-                valueOrDefault(data.inviteeAttachment().heading(), config.defaultAttachmentOneHeading())
-        );
+        setParagraphText(headings.attachmentOne(), config.defaultAttachmentOneHeading());
         setPageBreakBefore(headings.attachmentTwo());
-        setParagraphText(
-                headings.attachmentTwo(),
-                valueOrDefault(data.scheduleAttachment().heading(), config.defaultAttachmentTwoHeading())
-        );
+        setParagraphText(headings.attachmentTwo(), config.defaultAttachmentTwoHeading());
         setPageBreakBefore(headings.attachmentThree());
         setParagraphText(headings.attachmentThree(), config.defaultAttachmentThreeHeading());
     }
