@@ -385,7 +385,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub email-processing-${Stage}
-      VisibilityTimeout: 300  # 5 minutes
+      VisibilityTimeout: 960  # 16 minutes (must exceed Lambda timeout 900s)
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt EmailProcessingDLQ.Arn
         maxReceiveCount: 3
@@ -416,7 +416,7 @@ Resources:
       Runtime: python3.12
       Handler: index.lambda_handler
       CodeUri: ../lambda/email-processor
-      Timeout: 180
+      Timeout: 900
       Environment:
         Variables:
           PROJECTS_TABLE: !Ref ProjectsTable
