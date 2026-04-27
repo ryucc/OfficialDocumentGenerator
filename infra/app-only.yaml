@@ -457,7 +457,7 @@ Resources:
                 - bedrock:InvokeModel
               Resource:
                 - arn:aws:bedrock:*::foundation-model/anthropic.*
-                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
+                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*.anthropic.*
             - Sid: InvokeDocumentGenerator
               Effect: Allow
               Action:
