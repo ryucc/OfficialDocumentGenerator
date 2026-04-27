@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
 from email.utils import parseaddr
 from boto3.dynamodb.conditions import Key
+from botocore.config import Config
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -16,7 +17,11 @@ dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
 cognito = boto3.client('cognito-idp')
-bedrock = boto3.client('bedrock-runtime', region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'))
+bedrock = boto3.client(
+    'bedrock-runtime',
+    region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'),
+    config=Config(read_timeout=870, connect_timeout=10, retries={'max_attempts': 1}),
+)
 
 CLAUDE_MODEL_ID = os.environ.get('CLAUDE_MODEL_ID', 'anthropic.claude-sonnet-4-20250514-v1:0')
 
