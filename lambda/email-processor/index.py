@@ -421,10 +421,17 @@ def extract_and_ocr_attachments(bucket, email_key):
 
     ocr_texts = []
     for part in msg.walk():
-        if part.get_content_disposition() != 'attachment':
-            continue
+        filename = part.get_filename()
+        if not filename:
+            continue  # no filename → not an attachment
         content_type = part.get_content_type()
-        filename = part.get_filename() or f'attachment.{content_type.split("/")[-1]}'
+        # Emails often report application/octet-stream; guess from filename instead
+        if content_type == 'application/octet-stream':
+            import mimetypes
+            guessed, _ = mimetypes.guess_type(filename)
+            if guessed:
+                content_type = guessed
+        print(f"Attachment found: {filename} ({content_type}, disposition={part.get_content_disposition()})")
         data = part.get_payload(decode=True)
         if not data:
             continue
