@@ -3,69 +3,60 @@ import './Welcome.css'
 
 export default function Welcome() {
   return (
-    <div className="welcome-container">
-      <div className="welcome-content">
-        <div className="welcome-hero">
-          <div className="welcome-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
+    <div className="landing">
+      <header className="landing-topbar">
+        <div className="landing-brand">公文產生器</div>
+        <Link to="/login" className="landing-login">登入</Link>
+      </header>
+      <section className="landing-hero">
+        <h1 className="landing-hero-title">注重資訊安全的公文產生器</h1>
+      </section>
+      <section className="landing-how">
+        <h2 className="landing-how-title">服務流程</h2>
+        <p className="landing-how-subtitle">寄一封信，自動回覆符合格式的公文草稿</p>
+        <div className="landing-how-flow">
+          <div className="landing-how-step">
+            <div className="landing-how-step-icon">1</div>
+            <h3>寄信至 AI 信箱</h3>
+            <p>將案件資訊寄至 <code>ai@gongwengpt.click</code></p>
           </div>
-          <h1>公文產生器</h1>
-          <p className="welcome-subtitle">
-            透過 AI 自動將電子郵件轉換為正式公文格式
-          </p>
-        </div>
-
-        <div className="welcome-features">
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
-            <div>
-              <h3>郵件收取</h3>
-              <p>寄送郵件至指定信箱，系統自動接收並建立專案</p>
-            </div>
-          </div>
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <div>
-              <h3>AI 轉換</h3>
-              <p>根據範例文件，智慧生成符合格式的正式公文</p>
-            </div>
-          </div>
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </div>
-            <div>
-              <h3>下載成果</h3>
-              <p>完成後即可下載生成的公文檔案</p>
-            </div>
+          <div className="landing-how-arrow">→</div>
+          <div className="landing-how-step">
+            <div className="landing-how-step-icon">2</div>
+            <h3>收到附件回信</h3>
+            <p>系統自動產出 <code>.docx</code> 公文草稿並寄回</p>
           </div>
         </div>
-
-        <Link to="/login" className="welcome-cta">
-          登入系統
-        </Link>
-      </div>
+      </section>
+      <section className="landing-how landing-how--privacy">
+        <h2 className="landing-how-title">資料隱私</h2>
+        <p className="landing-how-subtitle">關於您的郵件與生成內容如何被處理</p>
+        <div className="landing-privacy-grid">
+          <div className="landing-privacy-card">
+            <div className="landing-privacy-icon">🚫</div>
+            <h3>AI 不訓練您的資料</h3>
+            <p>後端 AI 為 Anthropic Claude（透過 AWS Bedrock 呼叫）。依商用條款，您的郵件內容不會被留存或用於訓練。</p>
+            <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank" rel="noopener noreferrer">Anthropic 商用條款</a>
+          </div>
+          <div className="landing-privacy-card">
+            <div className="landing-privacy-icon">🔐</div>
+            <h3>不留於模型供應商</h3>
+            <p>AWS Bedrock 不儲存提示內容、不轉交模型供應商，亦不用於改善基礎模型。</p>
+            <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/data-protection.html" target="_blank" rel="noopener noreferrer">Bedrock 資料保護</a>
+          </div>
+          <div className="landing-privacy-card">
+            <div className="landing-privacy-icon">🗄️</div>
+            <h3>儲存於 AWS 東京</h3>
+            <p>郵件與生成的公文存放於 AWS 亞太（東京）區，底層雲端通過 ISO 27001、SOC 2 等國際資安認證。</p>
+            <a href="https://aws.amazon.com/compliance/programs/" target="_blank" rel="noopener noreferrer">查看 AWS 認證</a>
+          </div>
+          <div className="landing-privacy-card">
+            <div className="landing-privacy-icon">🗑️</div>
+            <h3>一鍵刪除歷史資料</h3>
+            <p>使用者可隨時清除過往專案、郵件與生成的公文；郵件預設於 90 天後自動刪除，符合單位資安政策。</p>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
