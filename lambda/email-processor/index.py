@@ -19,7 +19,7 @@ dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
 cognito = boto3.client('cognito-idp')
-textract = boto3.client('textract')
+textract = boto3.client('textract', region_name=os.environ.get('TEXTRACT_REGION', 'ap-southeast-1'))
 bedrock = boto3.client(
     'bedrock-runtime',
     region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'),
@@ -363,7 +363,7 @@ _TEXTRACT_SUPPORTED = {
 
 _DOCX_CONTENT_TYPES = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/msword',
+    # application/msword (.doc) is old binary format, not supported by python-docx
 }
 
 
