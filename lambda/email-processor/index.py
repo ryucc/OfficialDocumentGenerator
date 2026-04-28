@@ -248,6 +248,7 @@ def call_claude(thread_text, skill):
 
     result = json.loads(response['body'].read())
     content = result['content'][0]['text']
+    usage = result.get('usage', {}) or {}
 
     # Parse JSON from response (handle markdown code blocks)
     if '```json' in content:
@@ -255,7 +256,30 @@ def call_claude(thread_text, skill):
     elif '```' in content:
         content = content.split('```')[1].split('```')[0]
 
-    return json.loads(content)
+    return json.loads(content), usage
+
+
+# Bedrock pricing per 1M tokens (USD). Updated when models change.
+MODEL_PRICES = {
+    'sonnet-4-6': {'input': 3.0, 'output': 15.0, 'cache_read': 0.30, 'cache_write': 3.75},
+    'sonnet-4-5': {'input': 3.0, 'output': 15.0, 'cache_read': 0.30, 'cache_write': 3.75},
+    'haiku-4-5':  {'input': 1.0, 'output':  5.0, 'cache_read': 0.10, 'cache_write': 1.25},
+}
+
+
+def compute_cost_usd(usage: dict, model_id: str) -> float:
+    """Compute USD cost for one Bedrock invoke_model call from its usage block."""
+    prices = next((v for k, v in MODEL_PRICES.items() if k in model_id), MODEL_PRICES['sonnet-4-6'])
+    in_tok = usage.get('input_tokens', 0)
+    out_tok = usage.get('output_tokens', 0)
+    cache_read = usage.get('cache_read_input_tokens', 0)
+    cache_write = usage.get('cache_creation_input_tokens', 0)
+    return (
+        in_tok       * prices['input']       +
+        out_tok      * prices['output']      +
+        cache_read   * prices['cache_read']  +
+        cache_write  * prices['cache_write']
+    ) / 1_000_000
 
 
 def generate_docx(fields_json, project_id):
@@ -428,10 +452,14 @@ def lambda_handler(event, context):
                 all_missing = []
                 all_replies = []
                 attachments = []
+                total_cost_usd = 0.0
 
                 for skill in skills:
                     print(f"Processing skill: {skill['skillId']} ({skill.get('displayName', skill['name'])})")
-                    ai_result = call_claude(thread_text, skill)
+                    ai_result, usage = call_claude(thread_text, skill)
+                    skill_cost = compute_cost_usd(usage, CLAUDE_MODEL_ID)
+                    total_cost_usd += skill_cost
+                    print(f"Skill {skill['skillId']}: usage={usage}, cost=${skill_cost:.4f}")
                     is_complete = ai_result.get('complete', False)
                     print(f"Skill {skill['skillId']}: complete={is_complete}, missing={ai_result.get('missing', [])}")
 
@@ -469,6 +497,7 @@ def lambda_handler(event, context):
                         reply_body = '\n\n'.join(all_replies)
                     else:
                         reply_body = '您好，公文已根據您提供的資訊產生完成，請查收附件。'
+                    reply_body += f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_body,
                         email_message_id, attachments[0] if len(attachments) == 1 else attachments[0]
@@ -493,6 +522,7 @@ def lambda_handler(event, context):
                         reply_text = '\n\n'.join(all_replies)
                     else:
                         reply_text = '您好，請提供更多資訊以便產生公文。'
+                    reply_text += f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
 
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_text,
