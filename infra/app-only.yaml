@@ -458,6 +458,18 @@ Resources:
               Resource:
                 - arn:aws:bedrock:*::foundation-model/anthropic.*
                 - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*.anthropic.*
+            - Sid: TextractAccess
+              Effect: Allow
+              Action:
+                - textract:StartDocumentTextDetection
+                - textract:GetDocumentTextDetection
+              Resource: '*'
+            - Sid: S3AttachmentTempAccess
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub ${UploadedDocumentBucket.Arn}/textract-temp/*
             - Sid: InvokeDocumentGenerator
               Effect: Allow
               Action:

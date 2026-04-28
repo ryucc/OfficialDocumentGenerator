@@ -1,5 +1,7 @@
+import io
 import json
 import os
+import time
 import boto3
 import email
 from email import policy
@@ -17,6 +19,7 @@ dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
 cognito = boto3.client('cognito-idp')
+textract = boto3.client('textract')
 bedrock = boto3.client(
     'bedrock-runtime',
     region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'),
@@ -353,6 +356,107 @@ def send_reply(to_email, subject, body_text, original_message_id=None, attachmen
         return None
 
 
+_TEXTRACT_SUPPORTED = {
+    'application/pdf',
+    'image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/bmp',
+}
+
+_DOCX_CONTENT_TYPES = {
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+}
+
+
+def extract_docx_text(data: bytes) -> str:
+    from docx import Document
+    doc = Document(io.BytesIO(data))
+    return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
+
+
+def ocr_s3_object(bucket, key):
+    """Submit an async Textract job and poll by JobId until done. Returns extracted text."""
+    resp = textract.start_document_text_detection(
+        DocumentLocation={'S3Object': {'Bucket': bucket, 'Name': key}}
+    )
+    job_id = resp['JobId']
+    print(f"Textract job {job_id} started for s3://{bucket}/{key}")
+
+    delay = 3
+    for _ in range(25):  # max ~2 min of polling
+        time.sleep(delay)
+        result = textract.get_document_text_detection(JobId=job_id)
+        status = result['JobStatus']
+        if status == 'SUCCEEDED':
+            pages = [result]
+            while result.get('NextToken'):
+                result = textract.get_document_text_detection(
+                    JobId=job_id, NextToken=result['NextToken']
+                )
+                pages.append(result)
+            lines = [
+                b['Text']
+                for page in pages
+                for b in page['Blocks']
+                if b['BlockType'] == 'LINE'
+            ]
+            print(f"Textract job {job_id} succeeded: {len(lines)} lines extracted")
+            return '\n'.join(lines)
+        if status == 'FAILED':
+            print(f"Textract job {job_id} failed: {result.get('StatusMessage')}")
+            return ''
+        delay = min(delay * 1.5, 15)
+
+    print(f"Textract job {job_id} timed out")
+    return ''
+
+
+def extract_and_ocr_attachments(bucket, email_key):
+    """Extract attachments from an S3-stored email, OCR them via Textract, return combined text."""
+    try:
+        response = s3.get_object(Bucket=bucket, Key=email_key)
+        msg = email.message_from_bytes(response['Body'].read(), policy=policy.default)
+    except Exception as e:
+        print(f"Error reading email for attachments: {e}")
+        return ''
+
+    ocr_texts = []
+    for part in msg.walk():
+        if part.get_content_disposition() != 'attachment':
+            continue
+        content_type = part.get_content_type()
+        filename = part.get_filename() or f'attachment.{content_type.split("/")[-1]}'
+        data = part.get_payload(decode=True)
+        if not data:
+            continue
+
+        if content_type in _DOCX_CONTENT_TYPES:
+            try:
+                text = extract_docx_text(data)
+                if text:
+                    print(f"Extracted {len(text)} chars from docx attachment {filename}")
+                    ocr_texts.append(f"[附件: {filename}]\n{text}")
+            except Exception as e:
+                print(f"Error extracting docx {filename}: {e}")
+
+        elif content_type in _TEXTRACT_SUPPORTED:
+            temp_key = f'textract-temp/{email_key}/{filename}'
+            try:
+                s3.put_object(Bucket=bucket, Key=temp_key, Body=data, ContentType=content_type)
+                print(f"Uploaded attachment {filename} ({len(data)} bytes) to s3://{bucket}/{temp_key}")
+                text = ocr_s3_object(bucket, temp_key)
+                if text:
+                    ocr_texts.append(f"[附件: {filename}]\n{text}")
+            except Exception as e:
+                print(f"Error OCR-ing attachment {filename}: {e}")
+            finally:
+                try:
+                    s3.delete_object(Bucket=bucket, Key=temp_key)
+                except Exception:
+                    pass
+
+    return '\n\n'.join(ocr_texts)
+
+
 def lambda_handler(event, context):
     """
     Process SQS messages triggered by S3 email uploads.
@@ -446,6 +550,16 @@ def lambda_handler(event, context):
                 messages = load_thread_emails(bucket, project)
                 thread_text = format_thread_for_prompt(messages)
                 print(f"Thread has {len(messages)} message(s)")
+
+                # OCR any attachments across all emails in the thread
+                attachment_texts = []
+                for email_s3_key in [project.get('emailS3Key'), project.get('replyEmailS3Key')]:
+                    if email_s3_key:
+                        text = extract_and_ocr_attachments(bucket, email_s3_key)
+                        if text:
+                            attachment_texts.append(text)
+                if attachment_texts:
+                    thread_text += '\n\n[附件內容]\n' + '\n\n'.join(attachment_texts)
 
                 # Process each installed skill
                 all_complete = True
