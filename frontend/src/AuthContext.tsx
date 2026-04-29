@@ -81,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function completeNewPassword(newPassword: string) {
     const { confirmSignIn } = await import('aws-amplify/auth')
     await confirmSignIn({ challengeResponse: newPassword })
-    setNewPasswordRequired(false)
     await checkAuth()
+    setNewPasswordRequired(false)
   }
 
   async function logout() {
