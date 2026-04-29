@@ -429,10 +429,11 @@ def extract_and_ocr_attachments(bucket, email_key):
         if not filename:
             continue
         content_type = part.get_content_type()
-        if content_type == 'application/octet-stream':
+        if content_type not in _TEXTRACT_SUPPORTED and content_type not in _DOCX_CONTENT_TYPES:
             import mimetypes
             guessed, _ = mimetypes.guess_type(filename)
             if guessed:
+                print(f"Attachment {filename}: email reported '{content_type}', overriding with '{guessed}' from extension")
                 content_type = guessed
         print(f"Attachment found: {filename} ({content_type})")
         data = part.get_payload(decode=True)
