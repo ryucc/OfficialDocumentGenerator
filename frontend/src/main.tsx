@@ -9,6 +9,7 @@ import InstalledSkills from './InstalledSkills.tsx'
 import SkillDetail from './SkillDetail.tsx'
 import Login from './Login.tsx'
 import Welcome from './Welcome.tsx'
+import ChangePassword from './ChangePassword.tsx'
 import ProtectedRoute from './ProtectedRoute.tsx'
 import { AuthProvider, useAuth } from './AuthContext.tsx'
 
@@ -55,6 +56,19 @@ function Navigation({ theme, setTheme }: { theme: 'dark' | 'light', setTheme: (t
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         <span style={{ fontSize: '14px', opacity: 0.8 }}>{user?.email}</span>
+        <Link
+          to="/change-password"
+          style={{
+            padding: '6px 12px',
+            fontSize: '14px',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+            textDecoration: 'none',
+            color: 'inherit',
+          }}
+        >
+          變更密碼
+        </Link>
         <button
           onClick={() => logout()}
           style={{
@@ -139,6 +153,10 @@ function AppRouter() {
               <Marketplace />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/change-password"
+          element={<ChangePassword />}
         />
       </Routes>
     </>

@@ -18,7 +18,11 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      const result = await login(email, password)
+      if (result.newPasswordRequired) {
+        navigate('/change-password')
+        return
+      }
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗，請檢查您的帳號密碼')

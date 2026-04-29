@@ -24,8 +24,10 @@ if (!IS_MOCK) {
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
+  newPasswordRequired: boolean
   user: { email: string; userId: string } | null
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<{ newPasswordRequired: boolean }>
+  completeNewPassword: (newPassword: string) => Promise<void>
   logout: () => Promise<void>
   getIdToken: () => Promise<string | undefined>
 }
@@ -35,6 +37,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(IS_MOCK)
   const [isLoading, setIsLoading] = useState(!IS_MOCK)
+  const [newPasswordRequired, setNewPasswordRequired] = useState(false)
   const [user, setUser] = useState<{ email: string; userId: string } | null>(
     IS_MOCK ? { email: 'mock@example.com', userId: 'mock-user-id' } : null
   )
@@ -63,10 +66,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (IS_MOCK) {
       setUser({ email, userId: 'mock-user-id' })
       setIsAuthenticated(true)
-      return
+      return { newPasswordRequired: false }
     }
     const { signIn } = await import('aws-amplify/auth')
-    await signIn({ username: email, password })
+    const { nextStep } = await signIn({ username: email, password })
+    if (nextStep.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+      setNewPasswordRequired(true)
+      return { newPasswordRequired: true }
+    }
+    await checkAuth()
+    return { newPasswordRequired: false }
+  }
+
+  async function completeNewPassword(newPassword: string) {
+    const { confirmSignIn } = await import('aws-amplify/auth')
+    await confirmSignIn({ challengeResponse: newPassword })
+    setNewPasswordRequired(false)
     await checkAuth()
   }
 
@@ -95,8 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         isAuthenticated,
         isLoading,
+        newPasswordRequired,
         user,
         login,
+        completeNewPassword,
         logout,
         getIdToken,
       }}
