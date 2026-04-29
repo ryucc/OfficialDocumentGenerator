@@ -411,20 +411,30 @@ def ocr_s3_object(bucket, key):
 
 
 def extract_and_ocr_attachments(bucket, email_key):
-    """Extract attachments from an S3-stored email, OCR them via Textract, return combined text."""
+    """Extract attachments from an S3-stored email, OCR them via Textract.
+
+    Returns (ocr_text, skipped_filenames).
+    """
     try:
         response = s3.get_object(Bucket=bucket, Key=email_key)
         msg = email.message_from_bytes(response['Body'].read(), policy=policy.default)
     except Exception as e:
         print(f"Error reading email for attachments: {e}")
-        return ''
+        return '', []
 
     ocr_texts = []
+    skipped = []
     for part in msg.walk():
-        if part.get_content_disposition() != 'attachment':
+        filename = part.get_filename()
+        if not filename:
             continue
         content_type = part.get_content_type()
-        filename = part.get_filename() or f'attachment.{content_type.split("/")[-1]}'
+        if content_type == 'application/octet-stream':
+            import mimetypes
+            guessed, _ = mimetypes.guess_type(filename)
+            if guessed:
+                content_type = guessed
+        print(f"Attachment found: {filename} ({content_type})")
         data = part.get_payload(decode=True)
         if not data:
             continue
@@ -437,6 +447,7 @@ def extract_and_ocr_attachments(bucket, email_key):
                     ocr_texts.append(f"[附件: {filename}]\n{text}")
             except Exception as e:
                 print(f"Error extracting docx {filename}: {e}")
+                skipped.append(filename)
 
         elif content_type in _TEXTRACT_SUPPORTED:
             temp_key = f'textract-temp/{email_key}/{filename}'
@@ -448,13 +459,18 @@ def extract_and_ocr_attachments(bucket, email_key):
                     ocr_texts.append(f"[附件: {filename}]\n{text}")
             except Exception as e:
                 print(f"Error OCR-ing attachment {filename}: {e}")
+                skipped.append(filename)
             finally:
                 try:
                     s3.delete_object(Bucket=bucket, Key=temp_key)
                 except Exception:
                     pass
 
-    return '\n\n'.join(ocr_texts)
+        else:
+            print(f"Skipping unsupported attachment: {filename} ({content_type})")
+            skipped.append(filename)
+
+    return '\n\n'.join(ocr_texts), skipped
 
 
 def lambda_handler(event, context):
@@ -553,11 +569,13 @@ def lambda_handler(event, context):
 
                 # OCR any attachments across all emails in the thread
                 attachment_texts = []
+                skipped_attachments = []
                 for email_s3_key in [project.get('emailS3Key'), project.get('replyEmailS3Key')]:
                     if email_s3_key:
-                        text = extract_and_ocr_attachments(bucket, email_s3_key)
+                        text, skipped = extract_and_ocr_attachments(bucket, email_s3_key)
                         if text:
                             attachment_texts.append(text)
+                        skipped_attachments.extend(skipped)
                 if attachment_texts:
                     thread_text += '\n\n[附件內容]\n' + '\n\n'.join(attachment_texts)
 
@@ -605,13 +623,18 @@ def lambda_handler(event, context):
                         if ai_result.get('reply'):
                             all_replies.append(f"【{skill_label}】\n{ai_result['reply']}")
 
+                skipped_notice = (
+                    '\n\n注意：以下附件格式不支援，未納入處理：\n' +
+                    '\n'.join(f'- {f}' for f in skipped_attachments)
+                ) if skipped_attachments else ''
+
                 if all_complete and attachments:
                     # All skills complete — reply with all attachments
                     if all_replies:
                         reply_body = '\n\n'.join(all_replies)
                     else:
                         reply_body = '您好，公文已根據您提供的資訊產生完成，請查收附件。'
-                    reply_body += f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
+                    reply_body += skipped_notice + f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_body,
                         email_message_id, attachments[0] if len(attachments) == 1 else attachments[0]
@@ -636,7 +659,7 @@ def lambda_handler(event, context):
                         reply_text = '\n\n'.join(all_replies)
                     else:
                         reply_text = '您好，請提供更多資訊以便產生公文。'
-                    reply_text += f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
+                    reply_text += skipped_notice + f'\n\n---\n本次處理花費 US${total_cost_usd:.4f}'
 
                     ses_message_id = send_reply(
                         email_sender, email_subject, reply_text,
