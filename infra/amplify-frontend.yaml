@@ -49,7 +49,7 @@ Resources:
             paths:
               - frontend/node_modules/**/*
       CustomRules:
-        - Source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>'
+        - Source: '</^[^.]+$|\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>'
           Target: /index.html
           Status: '200'
       EnvironmentVariables:
