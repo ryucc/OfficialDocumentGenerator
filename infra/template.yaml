@@ -49,6 +49,8 @@ Resources:
                 Resource:
                   - !GetAtt ArtifactBucket.Arn
                   - !Sub ${ArtifactBucket.Arn}/*
+                  - !Sub arn:aws:s3:::gongwengpt-pipeline-artifacts-sg-${Stage}
+                  - !Sub arn:aws:s3:::gongwengpt-pipeline-artifacts-sg-${Stage}/*
               - Effect: Allow
                 Action:
                   - codebuild:StartBuild
