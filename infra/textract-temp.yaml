@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Temporary S3 bucket in ap-southeast-1 for Textract PDF OCR
+
+Parameters:
+  Stage:
+    Type: String
+    Default: test
+
+Resources:
+  TextractTempBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub gongwengpt-textract-temp-${Stage}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteTempOcr
+            Status: Enabled
+            Prefix: temp-ocr/
+            ExpirationInDays: 1
+
+Outputs:
+  BucketName:
+    Value: !Ref TextractTempBucket

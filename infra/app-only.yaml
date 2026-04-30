@@ -25,7 +25,7 @@ Parameters:
     Description: Route 53 Hosted Zone ID for gongwengpt.click
   TextractTempBucket:
     Type: String
-    Default: ''
+    Default: gongwengpt-textract-temp-test
     Description: S3 bucket in ap-southeast-1 for temporary PDF uploads during Textract OCR
 
 Globals:

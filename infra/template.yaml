@@ -167,7 +167,25 @@ Resources:
                 - Name: BuildOutput
         - Name: DeployTest
           Actions:
+            - Name: DeploySingaporeResources
+              RunOrder: 1
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              Region: ap-southeast-1
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub official-doc-generator-sg-${Stage}
+                TemplatePath: SourceOutput::infra/textract-temp.yaml
+                Capabilities: CAPABILITY_IAM
+                RoleArn: !GetAtt DeployRole.Arn
+                ParameterOverrides: !Sub '{"Stage": "${Stage}"}'
+              InputArtifacts:
+                - Name: SourceOutput
             - Name: DeployTest
+              RunOrder: 2
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
@@ -179,6 +197,6 @@ Resources:
                 TemplatePath: BuildOutput::packaged-template.yaml
                 Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
                 RoleArn: !GetAtt DeployRole.Arn
-                ParameterOverrides: !Sub '{"Stage": "${Stage}"}'
+                ParameterOverrides: !Sub '{"Stage": "${Stage}", "TextractTempBucket": "gongwengpt-textract-temp-${Stage}"}'
               InputArtifacts:
                 - Name: BuildOutput
