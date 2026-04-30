@@ -8,6 +8,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.apache.poi.xwpf.usermodel.UnderlinePatterns;
+import org.apache.xmlbeans.XmlCursor;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTFonts;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTRPr;
@@ -368,13 +369,26 @@ class OfficialDocumentDocxGenerator {
         for (XWPFParagraph paragraph : cell.getParagraphs()) {
             CTRPr paragraphProperties = copyRunProperties(paragraph);
             if (paragraphProperties != null) {
-                if (paragraphProperties.isSetColor()) paragraphProperties.unsetColor();
-                if (paragraphProperties.isSetRStyle()) paragraphProperties.unsetRStyle();
-                if (paragraphProperties.isSetU()) paragraphProperties.unsetU();
+                stripColorProperties(paragraphProperties);
                 return paragraphProperties;
             }
         }
         return defaultKaiTiRunProperties();
+    }
+
+    private static void stripColorProperties(CTRPr rPr) {
+        XmlCursor cursor = rPr.newCursor();
+        cursor.toFirstChild();
+        while (cursor.currentTokenType() != XmlCursor.TokenType.END
+                && cursor.currentTokenType() != XmlCursor.TokenType.NONE) {
+            String local = cursor.getName() != null ? cursor.getName().getLocalPart() : "";
+            if ("color".equals(local) || "rStyle".equals(local) || "u".equals(local)) {
+                cursor.removeXml();
+            } else {
+                cursor.toNextSibling();
+            }
+        }
+        cursor.dispose();
     }
 
     private static final String DEFAULT_FONT = "KaiTi";
