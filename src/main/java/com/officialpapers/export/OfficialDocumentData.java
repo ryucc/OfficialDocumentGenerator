@@ -32,6 +32,9 @@ public record OfficialDocumentData(
             @JsonProperty("預期效益") ExpectedBenefit expectedBenefit,
             @JsonProperty("預定核銷時間") String writeoffDate,
             @JsonProperty("預定成果報核時間") String resultReportDate,
+            @JsonProperty("申請單位預算科目") String applicantBudgetCategory,
+            @JsonProperty("其他來源名稱") String otherSourceName,
+            @JsonProperty("其他來源預算科目") String otherSourceBudgetCategory,
             @JsonProperty("備註列") List<String> noteLines,
             @JsonProperty("附件資料列") List<String> attachmentLines
     ) {
