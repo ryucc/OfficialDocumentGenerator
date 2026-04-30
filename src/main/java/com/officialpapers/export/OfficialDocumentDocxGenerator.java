@@ -385,7 +385,7 @@ class OfficialDocumentDocxGenerator {
             if ("color".equals(local) || "rStyle".equals(local) || "u".equals(local)) {
                 cursor.removeXml();
             } else {
-                cursor.toNextSibling();
+                if (!cursor.toNextSibling()) break;
             }
         }
         cursor.dispose();
