@@ -165,13 +165,17 @@ class OfficialDocumentDocxGenerator {
         setCellLines(table.getRow(7).getCell(2), List.of(safeText(form.timeRangeText())));
         setCellLines(table.getRow(8).getCell(2), List.of(safeText(form.annualPlanText())));
         String applicantMarker = funding.applicantEur() > 0 ? "★" : "□";
+        String applicantCategory = safeText(form.applicantBudgetCategory());
+        String applicantCategoryLine = "預算科目：" + (applicantCategory.isEmpty() ? "邀訪預算" : applicantCategory);
         setCellLines(table.getRow(10).getCell(1), List.of(
-                applicantMarker + " 申請單位經費", "（附件三：經費概算表）", "預算科目：邀訪預算"));
+                applicantMarker + " 申請單位經費", "（附件三：經費概算表）", applicantCategoryLine));
         setCellLines(table.getRow(10).getCell(2), formatFundingAmount(funding.applicantEur()));
         setCellLines(table.getRow(10).getCell(3), List.of(formatPercent(funding.applicantPercent())));
         String otherMarker = funding.otherEur() > 0 ? "★" : "□";
+        String otherName = safeText(form.otherSourceName());
+        String otherCategory = safeText(form.otherSourceBudgetCategory());
         setCellLines(table.getRow(11).getCell(1), List.of(
-                otherMarker + " 其他來源：", "預算科目："));
+                otherMarker + " 其他來源：" + otherName, "預算科目：" + otherCategory));
         setCellLines(table.getRow(11).getCell(2), formatFundingAmount(funding.otherEur()));
         setCellLines(table.getRow(11).getCell(3), List.of(formatPercent(funding.otherPercent())));
         setCellLines(table.getRow(12).getCell(1), renderSupportLines(deriveSupportSelection(funding)));
