@@ -1,7 +1,6 @@
 import io
 import json
 import os
-import time
 import boto3
 import email
 from email import policy
@@ -373,41 +372,12 @@ def extract_docx_text(data: bytes) -> str:
     return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
 
 
-def ocr_s3_object(bucket, key):
-    """Submit an async Textract job and poll by JobId until done. Returns extracted text."""
-    resp = textract.start_document_text_detection(
-        DocumentLocation={'S3Object': {'Bucket': bucket, 'Name': key}}
-    )
-    job_id = resp['JobId']
-    print(f"Textract job {job_id} started for s3://{bucket}/{key}")
-
-    delay = 3
-    for _ in range(25):  # max ~2 min of polling
-        time.sleep(delay)
-        result = textract.get_document_text_detection(JobId=job_id)
-        status = result['JobStatus']
-        if status == 'SUCCEEDED':
-            pages = [result]
-            while result.get('NextToken'):
-                result = textract.get_document_text_detection(
-                    JobId=job_id, NextToken=result['NextToken']
-                )
-                pages.append(result)
-            lines = [
-                b['Text']
-                for page in pages
-                for b in page['Blocks']
-                if b['BlockType'] == 'LINE'
-            ]
-            print(f"Textract job {job_id} succeeded: {len(lines)} lines extracted")
-            return '\n'.join(lines)
-        if status == 'FAILED':
-            print(f"Textract job {job_id} failed: {result.get('StatusMessage')}")
-            return ''
-        delay = min(delay * 1.5, 15)
-
-    print(f"Textract job {job_id} timed out")
-    return ''
+def ocr_bytes(data: bytes, filename: str) -> str:
+    """OCR a document from raw bytes using Textract sync API. Supports PDF, JPEG, PNG, TIFF up to 10MB."""
+    resp = textract.detect_document_text(Document={'Bytes': data})
+    lines = [b['Text'] for b in resp['Blocks'] if b['BlockType'] == 'LINE']
+    print(f"Textract sync succeeded for {filename}: {len(lines)} lines extracted")
+    return '\n'.join(lines)
 
 
 def extract_and_ocr_attachments(bucket, email_key):
@@ -451,21 +421,14 @@ def extract_and_ocr_attachments(bucket, email_key):
                 skipped.append(filename)
 
         elif content_type in _TEXTRACT_SUPPORTED:
-            temp_key = f'textract-temp/{email_key}/{filename}'
             try:
-                s3.put_object(Bucket=bucket, Key=temp_key, Body=data, ContentType=content_type)
-                print(f"Uploaded attachment {filename} ({len(data)} bytes) to s3://{bucket}/{temp_key}")
-                text = ocr_s3_object(bucket, temp_key)
+                print(f"OCR-ing attachment {filename} ({len(data)} bytes) via Textract sync API")
+                text = ocr_bytes(data, filename)
                 if text:
                     ocr_texts.append(f"[附件: {filename}]\n{text}")
             except Exception as e:
                 print(f"Error OCR-ing attachment {filename}: {e}")
                 skipped.append(filename)
-            finally:
-                try:
-                    s3.delete_object(Bucket=bucket, Key=temp_key)
-                except Exception:
-                    pass
 
         else:
             print(f"Skipping unsupported attachment: {filename} ({content_type})")
