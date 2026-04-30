@@ -132,9 +132,15 @@ Resources:
     Properties:
       Name: !Sub official-doc-generator-${Stage}-${AWS::StackName}
       RoleArn: !GetAtt PipelineRole.Arn
-      ArtifactStore:
-        Type: S3
-        Location: !Ref ArtifactBucket
+      ArtifactStores:
+        - Region: ap-northeast-1
+          ArtifactStore:
+            Type: S3
+            Location: !Ref ArtifactBucket
+        - Region: ap-southeast-1
+          ArtifactStore:
+            Type: S3
+            Location: !Sub gongwengpt-pipeline-artifacts-sg-${Stage}
       Stages:
         - Name: Source
           Actions:

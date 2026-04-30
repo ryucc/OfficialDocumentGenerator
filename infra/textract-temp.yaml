@@ -18,6 +18,15 @@ Resources:
             Prefix: temp-ocr/
             ExpirationInDays: 1
 
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub gongwengpt-pipeline-artifacts-sg-${Stage}
+      VersioningConfiguration:
+        Status: Enabled
+
 Outputs:
-  BucketName:
+  TextractTempBucketName:
     Value: !Ref TextractTempBucket
+  PipelineArtifactBucketName:
+    Value: !Ref PipelineArtifactBucket
