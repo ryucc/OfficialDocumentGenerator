@@ -23,6 +23,10 @@ Parameters:
     Type: String
     Default: Z08801051G2GR30IAD1A4
     Description: Route 53 Hosted Zone ID for gongwengpt.click
+  TextractTempBucket:
+    Type: String
+    Default: ''
+    Description: S3 bucket in ap-southeast-1 for temporary PDF uploads during Textract OCR
 
 Globals:
   Function:
@@ -429,6 +433,7 @@ Resources:
           SKILLS_TABLE: !Ref SkillsTable
           SKILLS_BUCKET: !Ref UploadedDocumentBucket
           TEXTRACT_REGION: ap-southeast-1
+          TEXTRACT_TEMP_BUCKET: !Ref TextractTempBucket
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProjectsTable
@@ -463,7 +468,15 @@ Resources:
               Effect: Allow
               Action:
                 - textract:DetectDocumentText
+                - textract:StartDocumentTextDetection
+                - textract:GetDocumentTextDetection
               Resource: '*'
+            - Sid: TextractTempS3Access
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub arn:aws:s3:::${TextractTempBucket}/temp-ocr/*
             - Sid: InvokeDocumentGenerator
               Effect: Allow
               Action:

@@ -18,7 +18,10 @@ dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 ses = boto3.client('ses')
 cognito = boto3.client('cognito-idp')
-textract = boto3.client('textract', region_name=os.environ.get('TEXTRACT_REGION', 'ap-southeast-1'))
+_TEXTRACT_REGION = os.environ.get('TEXTRACT_REGION', 'ap-southeast-1')
+textract = boto3.client('textract', region_name=_TEXTRACT_REGION)
+s3_textract = boto3.client('s3', region_name=_TEXTRACT_REGION)
+TEXTRACT_TEMP_BUCKET = os.environ.get('TEXTRACT_TEMP_BUCKET', '')
 bedrock = boto3.client(
     'bedrock-runtime',
     region_name=os.environ.get('BEDROCK_REGION', 'us-east-1'),
@@ -382,11 +385,51 @@ def extract_docx_text(data: bytes) -> str:
 
 
 def ocr_bytes(data: bytes, filename: str) -> str:
-    """OCR a document from raw bytes using Textract sync API. Supports PDF, JPEG, PNG, TIFF up to 10MB."""
+    """OCR an image from raw bytes using Textract sync API. Supports JPEG, PNG, TIFF, BMP up to 10MB."""
     resp = textract.detect_document_text(Document={'Bytes': data})
     lines = [b['Text'] for b in resp['Blocks'] if b['BlockType'] == 'LINE']
     print(f"Textract sync succeeded for {filename}: {len(lines)} lines extracted")
     return '\n'.join(lines)
+
+
+def ocr_pdf_via_s3(data: bytes, filename: str) -> str:
+    """OCR a PDF via Textract async API. Uploads bytes to a temp Singapore S3 key, polls, then cleans up."""
+    import time
+    if not TEXTRACT_TEMP_BUCKET:
+        raise Exception("TEXTRACT_TEMP_BUCKET is not configured — cannot OCR PDF")
+    temp_key = f"temp-ocr/{uuid4()}/{filename}"
+    try:
+        s3_textract.put_object(Bucket=TEXTRACT_TEMP_BUCKET, Key=temp_key, Body=data)
+        resp = textract.start_document_text_detection(
+            DocumentLocation={'S3Object': {'Bucket': TEXTRACT_TEMP_BUCKET, 'Name': temp_key}}
+        )
+        job_id = resp['JobId']
+
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            result = textract.get_document_text_detection(JobId=job_id)
+            status = result['JobStatus']
+            if status == 'SUCCEEDED':
+                break
+            if status == 'FAILED':
+                raise Exception(f"Textract job failed: {result.get('StatusMessage')}")
+            time.sleep(3)
+        else:
+            raise Exception("Textract job timed out after 120s")
+
+        pages = [result]
+        while result.get('NextToken'):
+            result = textract.get_document_text_detection(JobId=job_id, NextToken=result['NextToken'])
+            pages.append(result)
+
+        lines = [b['Text'] for page in pages for b in page['Blocks'] if b['BlockType'] == 'LINE']
+        print(f"Textract async succeeded for {filename}: {len(lines)} lines extracted")
+        return '\n'.join(lines)
+    finally:
+        try:
+            s3_textract.delete_object(Bucket=TEXTRACT_TEMP_BUCKET, Key=temp_key)
+        except Exception:
+            pass
 
 
 def extract_and_ocr_attachments(bucket, email_key):
@@ -431,8 +474,12 @@ def extract_and_ocr_attachments(bucket, email_key):
 
         elif content_type in _TEXTRACT_SUPPORTED:
             try:
-                print(f"OCR-ing attachment {filename} ({len(data)} bytes) via Textract sync API")
-                text = ocr_bytes(data, filename)
+                if content_type == 'application/pdf':
+                    print(f"OCR-ing PDF attachment {filename} ({len(data)} bytes) via Textract async S3 API")
+                    text = ocr_pdf_via_s3(data, filename)
+                else:
+                    print(f"OCR-ing attachment {filename} ({len(data)} bytes) via Textract sync API")
+                    text = ocr_bytes(data, filename)
                 if text:
                     ocr_texts.append(f"[附件: {filename}]\n{text}")
             except Exception as e:
