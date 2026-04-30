@@ -462,15 +462,8 @@ Resources:
             - Sid: TextractAccess
               Effect: Allow
               Action:
-                - textract:StartDocumentTextDetection
-                - textract:GetDocumentTextDetection
+                - textract:DetectDocumentText
               Resource: '*'
-            - Sid: S3AttachmentTempAccess
-              Effect: Allow
-              Action:
-                - s3:PutObject
-                - s3:DeleteObject
-              Resource: !Sub ${UploadedDocumentBucket.Arn}/textract-temp/*
             - Sid: InvokeDocumentGenerator
               Effect: Allow
               Action:

@@ -32,6 +32,22 @@ export default function ChangePassword() {
       setError('新密碼至少需要 8 個字元')
       return
     }
+    if (!/[A-Z]/.test(newPassword)) {
+      setError('新密碼需包含至少一個大寫字母 (A-Z)')
+      return
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      setError('新密碼需包含至少一個小寫字母 (a-z)')
+      return
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError('新密碼需包含至少一個數字 (0-9)')
+      return
+    }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      setError('新密碼需包含至少一個特殊符號 (例如 !@#$%)')
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -107,6 +123,13 @@ export default function ChangePassword() {
               placeholder="••••••••"
               className="form-input"
             />
+            <ul style={{ margin: '6px 0 0', paddingLeft: '18px', fontSize: '12px', color: 'var(--text-muted, #888)', lineHeight: '1.6' }}>
+              <li>至少 8 個字元</li>
+              <li>包含大寫字母 (A-Z)</li>
+              <li>包含小寫字母 (a-z)</li>
+              <li>包含數字 (0-9)</li>
+              <li>包含特殊符號，例如 !@#$%^&*</li>
+            </ul>
           </div>
 
           <div className="form-group">
