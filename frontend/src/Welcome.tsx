@@ -9,7 +9,9 @@ export default function Welcome() {
         <Link to="/login" className="landing-login">登入</Link>
       </header>
       <section className="landing-hero">
-        <h1 className="landing-hero-title">注重資訊安全的公文產生器</h1>
+        <h1 className="landing-hero-title">一封郵件，安心生成專業公文</h1>
+        <p className="landing-hero-sub">不用懂 AI，也能寫好公文</p>
+        <p className="landing-hero-sub">資安優先，公文生成更安心</p>
       </section>
       <section className="landing-how">
         <h2 className="landing-how-title">服務流程</h2>
