@@ -18,6 +18,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -179,8 +181,8 @@ class OfficialDocumentDocxGenerator {
         setCellLines(table.getRow(12).getCell(3), List.of(formatPercent(funding.requestedPercent())));
         setCellLines(table.getRow(13).getCell(2), List.of(safeText(form.overHalfReason())));
         setExpectedBenefitCell(table.getRow(14).getCell(1), form.expectedBenefit());
-        setCellLines(table.getRow(15).getCell(1), List.of(safeText(form.writeoffDate())));
-        setCellLines(table.getRow(15).getCell(3), List.of(safeText(form.resultReportDate())));
+        setCellLines(table.getRow(15).getCell(1), List.of(defaultDate(form.writeoffDate(), 14)));
+        setCellLines(table.getRow(15).getCell(3), List.of(defaultDate(form.resultReportDate(), 28)));
         setCellLines(table.getRow(16).getCell(1), safeLines(form.noteLines()));
         setCellLines(table.getRow(17).getCell(1), prefixLines("★ ", form.attachmentLines()));
     }
@@ -416,6 +418,14 @@ class OfficialDocumentDocxGenerator {
 
     private String formatPercent(int percent) {
         return percent == 0 ? "" : percent + "%";
+    }
+
+    private static final DateTimeFormatter ROC_DATE = DateTimeFormatter.ofPattern("yyyy年M月d日");
+
+    private String defaultDate(String value, int offsetDays) {
+        String s = safeText(value);
+        if (!s.isEmpty()) return s;
+        return LocalDate.now().plusDays(offsetDays).format(ROC_DATE);
     }
 
     private String chineseTwdFormat(long amount) {
