@@ -92,17 +92,20 @@ def load_skill_details(skill_ids):
             if not item:
                 continue
 
-            # Load instructions from S3
+            # Load instructions and output schema from S3
             instructions = ''
+            output_schema = None
             if bucket:
                 try:
-                    obj = s3.get_object(
-                        Bucket=bucket,
-                        Key=f'skills/{skill_id}/instructions.md',
-                    )
+                    obj = s3.get_object(Bucket=bucket, Key=f'skills/{skill_id}/instructions.md')
                     instructions = obj['Body'].read().decode('utf-8')
                 except Exception as e:
                     print(f"Error loading instructions for {skill_id}: {e}")
+                try:
+                    obj = s3.get_object(Bucket=bucket, Key=f'skills/{skill_id}/output_schema.json')
+                    output_schema = json.loads(obj['Body'].read().decode('utf-8'))
+                except Exception as e:
+                    print(f"No output_schema.json for {skill_id}, will use text parsing: {e}")
 
             skills.append({
                 'skillId': skill_id,
@@ -110,6 +113,7 @@ def load_skill_details(skill_ids):
                 'displayName': item.get('displayName', ''),
                 'schemaJson': item.get('schemaJson', ''),
                 'instructions': instructions,
+                'outputSchema': output_schema,
             })
         except Exception as e:
             print(f"Error loading skill {skill_id}: {e}")
@@ -225,39 +229,44 @@ def format_thread_for_prompt(messages):
 
 def call_claude(thread_text, skill):
     """Call Claude via Bedrock to extract fields from the email thread using a specific skill."""
-    # Use skill-specific instructions if available, fall back to default
-    if skill and skill.get('instructions'):
-        system_prompt = skill['instructions']
-    else:
-        system_prompt = load_prompt('extract_fields')
+    system_prompt = skill['instructions'] if skill and skill.get('instructions') else load_prompt('extract_fields')
+    output_schema = skill.get('outputSchema') if skill else None
+
+    body = {
+        'anthropic_version': 'bedrock-2023-05-31',
+        'max_tokens': 32768,
+        'system': system_prompt,
+        'messages': [
+            {
+                'role': 'user',
+                'content': f'以下是郵件對話串，請擷取公文所需資訊：\n\n{thread_text}',
+            }
+        ],
+    }
+    if output_schema:
+        body['output_config'] = {'format': {'type': 'json_schema', 'schema': output_schema}}
 
     response = bedrock.invoke_model(
         modelId=CLAUDE_MODEL_ID,
         contentType='application/json',
         accept='application/json',
-        body=json.dumps({
-            'anthropic_version': 'bedrock-2023-05-31',
-            'max_tokens': 32768,
-            'system': system_prompt,
-            'messages': [
-                {
-                    'role': 'user',
-                    'content': f'以下是郵件對話串，請擷取公文所需資訊：\n\n{thread_text}',
-                }
-            ],
-        }),
+        body=json.dumps(body),
     )
 
     result = json.loads(response['body'].read())
-    content = result['content'][0]['text']
     usage = result.get('usage', {}) or {}
 
-    # Parse JSON from response (handle markdown code blocks)
+    if output_schema:
+        # Structured output: response is already valid JSON in content
+        content = result['content'][0]['text']
+        return json.loads(content), usage
+
+    # Fallback: parse JSON from free-form text (handle markdown code blocks)
+    content = result['content'][0]['text']
     if '```json' in content:
         content = content.split('```json')[1].split('```')[0]
     elif '```' in content:
         content = content.split('```')[1].split('```')[0]
-
     return json.loads(content), usage
 
 
