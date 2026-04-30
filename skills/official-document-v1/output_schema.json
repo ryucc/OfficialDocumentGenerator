@@ -1,0 +1,137 @@
+{
+  "type": "object",
+  "properties": {
+    "complete": { "type": "boolean" },
+    "fields": {
+      "type": "object",
+      "properties": {
+        "輸出檔名": { "type": "string" },
+        "標題": { "type": "string" },
+        "申請表": {
+          "type": "object",
+          "properties": {
+            "申請單位": { "type": "string" },
+            "申請日期": { "type": "string" },
+            "申請文號": { "type": "string" },
+            "對象勾選列": { "type": "string" },
+            "緣由": { "type": "string" },
+            "市場屬性": { "type": "string" },
+            "方式": { "type": "string" },
+            "人數": { "type": "string" },
+            "出發地": { "type": "string" },
+            "時間": { "type": "string" },
+            "年度計畫": { "type": "string" },
+            "超過五成理由": { "type": "string" },
+            "預期效益": {
+              "type": "object",
+              "properties": {
+                "影響範圍": { "type": "string" },
+                "影響層面": { "type": "string" },
+                "預估達成旅遊人數": { "type": "string" },
+                "其他效益": { "type": "string" }
+              },
+              "required": ["影響範圍", "影響層面", "預估達成旅遊人數", "其他效益"],
+              "additionalProperties": false
+            },
+            "申請單位預算科目": { "type": "string" },
+            "其他來源名稱": { "type": "string" },
+            "其他來源預算科目": { "type": "string" },
+            "預定核銷時間": { "type": "string" },
+            "預定成果報核時間": { "type": "string" },
+            "備註列": { "type": "array", "items": { "type": "string" } },
+            "附件資料列": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["申請單位", "申請日期", "申請文號", "對象勾選列", "緣由", "市場屬性", "方式", "人數", "出發地", "時間", "年度計畫", "超過五成理由", "預期效益", "申請單位預算科目", "其他來源名稱", "其他來源預算科目", "預定核銷時間", "預定成果報核時間", "備註列", "附件資料列"],
+          "additionalProperties": false
+        },
+        "附件一": {
+          "type": "object",
+          "properties": {
+            "名單": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "編號": { "type": "string" },
+                  "姓名": { "type": "string" },
+                  "性別": { "type": "string" },
+                  "職稱": { "type": "string" },
+                  "單位名稱": { "type": "string" },
+                  "邀訪紀錄": { "type": "string" },
+                  "成效評估": { "type": "string" },
+                  "備註": { "type": "string" }
+                },
+                "required": ["編號", "姓名", "性別", "職稱", "單位名稱", "邀訪紀錄", "成效評估", "備註"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["名單"],
+          "additionalProperties": false
+        },
+        "附件二": {
+          "type": "object",
+          "properties": {
+            "航班資訊": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "航班資訊": { "type": "string" },
+                  "班機號碼": { "type": "string" },
+                  "出發時間": { "type": "string" },
+                  "抵達時間": { "type": "string" }
+                },
+                "required": ["航班資訊", "班機號碼", "出發時間", "抵達時間"],
+                "additionalProperties": false
+              }
+            },
+            "行程表": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "日期列": { "type": "array", "items": { "type": "string" } },
+                  "建議行程列": { "type": "array", "items": { "type": "string" } },
+                  "住宿列": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["日期列", "建議行程列", "住宿列"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["航班資訊", "行程表"],
+          "additionalProperties": false
+        },
+        "附件三": {
+          "type": "object",
+          "properties": {
+            "明細": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "內容": { "type": "string" },
+                  "單價": { "type": "integer" },
+                  "數量": { "type": "integer" },
+                  "資金來源": { "type": "string" },
+                  "備註": { "type": "string" }
+                },
+                "required": ["內容", "單價", "數量", "資金來源", "備註"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["明細"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["輸出檔名", "標題", "申請表", "附件一", "附件二", "附件三"],
+      "additionalProperties": false
+    },
+    "missing": { "type": "array", "items": { "type": "string" } },
+    "reply": { "type": "string" }
+  },
+  "required": ["complete", "fields", "missing", "reply"],
+  "additionalProperties": false
+}

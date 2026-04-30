@@ -368,6 +368,9 @@ class OfficialDocumentDocxGenerator {
         for (XWPFParagraph paragraph : cell.getParagraphs()) {
             CTRPr paragraphProperties = copyRunProperties(paragraph);
             if (paragraphProperties != null) {
+                if (paragraphProperties.isSetColor()) paragraphProperties.unsetColor();
+                if (paragraphProperties.isSetRStyle()) paragraphProperties.unsetRStyle();
+                if (paragraphProperties.isSetU()) paragraphProperties.unsetU();
                 return paragraphProperties;
             }
         }
