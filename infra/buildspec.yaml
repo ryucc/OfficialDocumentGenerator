@@ -26,6 +26,8 @@ phases:
       - cd lambda/projects-api-rust && cargo lambda build --release --output-format zip && cd ../..
       - cd lambda/skills-api && cargo lambda build --release --output-format zip && cd ../..
       - cd lambda/user-skills-api && cargo lambda build --release --output-format zip && cd ../..
+      # Install Python Lambda dependencies
+      - pip install -r lambda/email-processor/requirements.txt -t lambda/email-processor/
       # Package SAM template
       - sam package --template-file infra/app-only.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
 
