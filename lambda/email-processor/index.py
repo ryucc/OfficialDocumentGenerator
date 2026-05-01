@@ -401,7 +401,8 @@ def ocr_pdf_via_s3(data: bytes, filename: str) -> str:
     print(f"PDF OCR: uploading to s3://{TEXTRACT_TEMP_BUCKET}/{temp_key} via {_TEXTRACT_REGION}")
     try:
         s3_textract.put_object(Bucket=TEXTRACT_TEMP_BUCKET, Key=temp_key, Body=data)
-        print(f"PDF OCR: upload complete, starting Textract job")
+        head = s3_textract.head_object(Bucket=TEXTRACT_TEMP_BUCKET, Key=temp_key)
+        print(f"PDF OCR: upload verified ({head['ContentLength']} bytes), starting Textract job")
         resp = textract.start_document_text_detection(
             DocumentLocation={'S3Object': {'Bucket': TEXTRACT_TEMP_BUCKET, 'Name': temp_key}}
         )
