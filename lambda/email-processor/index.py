@@ -647,8 +647,9 @@ def lambda_handler(event, context):
                             all_replies.append(f"【{skill_label}】\n{ai_result['reply']}")
 
                 skipped_notice = (
-                    '\n\n注意：以下附件格式不支援，未納入處理：\n' +
-                    '\n'.join(f'- {f}' for f in skipped_attachments)
+                    '\n\n注意：以下附件無法解析，未納入處理：\n' +
+                    '\n'.join(f'- {f}' for f in skipped_attachments) +
+                    '\n\n支援的附件格式：PDF、JPEG、PNG、TIFF、BMP（圖片/掃描件）、DOCX（Word 文件）'
                 ) if skipped_attachments else ''
 
                 if all_complete and attachments:
