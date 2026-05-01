@@ -509,6 +509,8 @@ def lambda_handler(event, context):
 
     for record in event['Records']:
         try:
+            approximate_receive_count = int(record.get('attributes', {}).get('ApproximateReceiveCount', 1))
+
             message_body = json.loads(record['body'])
 
             if 'Message' in message_body:
@@ -520,7 +522,7 @@ def lambda_handler(event, context):
                 bucket = s3_record['s3']['bucket']['name']
                 key = s3_record['s3']['object']['key']
 
-                print(f"Processing email from S3: s3://{bucket}/{key}")
+                print(f"Processing email from S3: s3://{bucket}/{key} (receive count: {approximate_receive_count})")
 
                 email_metadata = extract_email_metadata(bucket, key)
                 email_subject = email_metadata['subject']
@@ -528,6 +530,22 @@ def lambda_handler(event, context):
                 email_message_id = email_metadata['messageId']
                 in_reply_to = email_metadata['inReplyTo']
                 print(f"Email subject: {email_subject}, sender: {email_sender}, in_reply_to: {in_reply_to}")
+
+                if approximate_receive_count >= 3:
+                    print(f"Receive count {approximate_receive_count} >= 3, sending failure notice to {email_sender}")
+                    send_reply(
+                        to_email=email_sender,
+                        subject=email_subject,
+                        body_text=(
+                            '您好，\n\n'
+                            '很抱歉，您的郵件在處理過程中發生錯誤，系統多次嘗試後仍無法完成處理。\n\n'
+                            '請聯繫系統管理員以取得協助。\n\n'
+                            '敬上\n'
+                            'GongWenGPT 系統'
+                        ),
+                        original_message_id=email_message_id,
+                    )
+                    continue
 
                 timestamp = datetime.utcnow().isoformat()
 
