@@ -30,6 +30,8 @@ interface AuthContextType {
   completeNewPassword: (newPassword: string) => Promise<void>
   logout: () => Promise<void>
   getIdToken: () => Promise<string | undefined>
+  requestPasswordReset: (email: string) => Promise<void>
+  confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -94,6 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  async function requestPasswordReset(email: string) {
+    if (IS_MOCK) return
+    const { resetPassword } = await import('aws-amplify/auth')
+    await resetPassword({ username: email })
+  }
+
+  async function confirmPasswordReset(email: string, code: string, newPassword: string) {
+    if (IS_MOCK) return
+    const { confirmResetPassword } = await import('aws-amplify/auth')
+    await confirmResetPassword({ username: email, confirmationCode: code, newPassword })
+  }
+
   async function getIdToken(): Promise<string | undefined> {
     if (IS_MOCK) return 'mock-token'
     try {
@@ -116,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         completeNewPassword,
         logout,
         getIdToken,
+        requestPasswordReset,
+        confirmPasswordReset,
       }}
     >
       {children}
