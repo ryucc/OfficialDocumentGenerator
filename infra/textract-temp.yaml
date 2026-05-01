@@ -29,9 +29,6 @@ Resources:
               Service: textract.amazonaws.com
             Action: s3:GetObject
             Resource: !Sub ${TextractTempBucket.Arn}/*
-            Condition:
-              StringEquals:
-                aws:SourceAccount: !Ref AWS::AccountId
 
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
