@@ -27,7 +27,8 @@ phases:
       - cd lambda/skills-api && cargo lambda build --release --output-format zip && cd ../..
       - cd lambda/user-skills-api && cargo lambda build --release --output-format zip && cd ../..
       # Install Python Lambda dependencies (manylinux wheels for Lambda/AL2023 compatibility)
-      - pip install -r lambda/email-processor/requirements.txt -t lambda/email-processor/ --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --implementation cp
+      - |
+        pip3 install -r lambda/email-processor/requirements.txt -t lambda/email-processor/ --platform manylinux2014_x86_64 --python-version 3.12 --only-binary=:all: --implementation cp
       # Package SAM template
       - sam package --template-file infra/app-only.yaml --s3-bucket $ARTIFACT_BUCKET --output-template-file packaged-template.yaml
 
