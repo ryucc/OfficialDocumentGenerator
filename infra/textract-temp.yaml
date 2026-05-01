@@ -18,6 +18,21 @@ Resources:
             Prefix: temp-ocr/
             ExpirationInDays: 1
 
+  TextractTempBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TextractTempBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: textract.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${TextractTempBucket.Arn}/*
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
